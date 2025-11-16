@@ -74,8 +74,11 @@ export async function GET(request: NextRequest) {
           diff = compareSnapshots(latestSnapshot, { answer });
           hasChanges = hasSignificantChanges(diff);
 
-          if (!hasChanges) {
-            console.log(`No significant changes for ${subscription.questionId}, skipping send`);
+          // Check if user wants notifications only on change
+          const notifyOnChangeOnly = subscription.notifyOnChangeOnly ?? true; // Default to true for backward compatibility
+
+          if (!hasChanges && notifyOnChangeOnly) {
+            console.log(`No significant changes for ${subscription.questionId} and user wants change-only notifications, skipping send`);
 
             // Still update next send time even if we skip
             const nextSendAt = new Date(
@@ -95,7 +98,11 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        console.log(`Significant changes detected, sending update...`);
+        if (hasChanges) {
+          console.log(`Significant changes detected, sending update...`);
+        } else {
+          console.log(`No changes but user wants all updates, sending anyway...`);
+        }
 
         // Send based on delivery method
         const deliveryMethod = subscription.deliveryMethod || 'email';

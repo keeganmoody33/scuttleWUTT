@@ -202,6 +202,7 @@ export const questionSubscriptions = pgTable('question_subscriptions', {
 
   lastSentAt: timestamp('last_sent_at'),
   nextSendAt: timestamp('next_send_at').notNull(),
+  notifyOnChangeOnly: boolean('notify_on_change_only').default(true).notNull(), // Only send when answer changes
   active: boolean('active').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({

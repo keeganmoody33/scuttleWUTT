@@ -14,6 +14,7 @@ const SubscribeSchema = z.object({
   questionId: z.string().min(1, 'Question ID is required'),
   question: z.string().min(5, 'Question must be at least 5 characters'),
   frequencyDays: z.number().int().min(1).max(90, 'Frequency must be between 1 and 90 days'),
+  notifyOnChangeOnly: z.boolean().default(true),
 }).refine(
   (data) => {
     // Validate based on delivery method
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
     // Validate input
     const validatedData = SubscribeSchema.parse(body);
 
-    const { email, phone, deliveryMethod, questionId, question, frequencyDays } = validatedData;
+    const { email, phone, deliveryMethod, questionId, question, frequencyDays, notifyOnChangeOnly } = validatedData;
 
     console.log(`Processing subscription: ${email || phone} via ${deliveryMethod} for question "${question}" (every ${frequencyDays} days)`);
 
@@ -76,6 +77,7 @@ export async function POST(request: NextRequest) {
           phone: formattedPhone || existing.phone,
           deliveryMethod,
           frequencyDays,
+          notifyOnChangeOnly,
           nextSendAt: new Date(Date.now() + frequencyDays * 24 * 60 * 60 * 1000),
         })
         .where(eq(questionSubscriptions.id, existing.id));
@@ -105,6 +107,7 @@ export async function POST(request: NextRequest) {
       questionId,
       question,
       frequencyDays,
+      notifyOnChangeOnly,
       nextSendAt,
       verified: false, // Not verified yet
       verificationCode,

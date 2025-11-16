@@ -1,0 +1,1 @@
+ALTER TABLE "question_subscriptions" ADD COLUMN "notify_on_change_only" boolean DEFAULT true NOT NULL;

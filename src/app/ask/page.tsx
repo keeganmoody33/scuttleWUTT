@@ -35,6 +35,7 @@ export default function AskPage() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [frequencyDays, setFrequencyDays] = useState(7); // Default to weekly
+  const [notifyOnChangeOnly, setNotifyOnChangeOnly] = useState(true); // Default to change-only
   const [subscribing, setSubscribing] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
 
@@ -106,6 +107,7 @@ export default function AskPage() {
           questionId: answer.questionId,
           question: answer.question,
           frequencyDays,
+          notifyOnChangeOnly,
         }),
       });
 
@@ -413,6 +415,42 @@ export default function AskPage() {
                       <option value={14}>Every 2 weeks</option>
                       <option value={30}>Monthly</option>
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      When do you want to be notified?
+                    </label>
+                    <div className="grid grid-cols-1 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setNotifyOnChangeOnly(true)}
+                        className={`px-4 py-3 rounded-lg border-2 transition text-left ${
+                          notifyOnChangeOnly
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-300 text-gray-700 hover:border-blue-300'
+                        }`}
+                      >
+                        <div className="font-semibold">Only when the answer changes</div>
+                        <div className="text-xs mt-1 opacity-80">
+                          We'll skip updates if nothing has changed (recommended)
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNotifyOnChangeOnly(false)}
+                        className={`px-4 py-3 rounded-lg border-2 transition text-left ${
+                          !notifyOnChangeOnly
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-300 text-gray-700 hover:border-blue-300'
+                        }`}
+                      >
+                        <div className="font-semibold">Every time (even if no changes)</div>
+                        <div className="text-xs mt-1 opacity-80">
+                          Get updates on your schedule regardless of changes
+                        </div>
+                      </button>
+                    </div>
                   </div>
 
                   <button

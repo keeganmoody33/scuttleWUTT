@@ -8,6 +8,13 @@
       "when": 1763316166001,
       "tag": "0000_bent_captain_flint",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1763316505706,
+      "tag": "0001_sloppy_firestar",
+      "breakpoints": true
     }
   ]
 }
