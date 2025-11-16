@@ -194,8 +194,19 @@ export default function AskPage() {
           <Link href="/" className="text-xl font-bold text-gray-900">
             Scuttle What
           </Link>
-          <div className="text-sm text-gray-600">
-            Ask. Get answers. Subscribe to updates.
+          <div className="flex items-center gap-6">
+            <Link
+              href="/compare"
+              className="text-sm font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
+            >
+              <span>Compare Models</span>
+              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">
+                30+ AI models
+              </span>
+            </Link>
+            <div className="text-sm text-gray-600">
+              Ask. Get answers. Subscribe.
+            </div>
           </div>
         </nav>
       </header>
