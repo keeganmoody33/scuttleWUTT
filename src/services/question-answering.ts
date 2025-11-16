@@ -1,8 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+import { callLLM, type LLMModel } from './llm';
 
 export interface Tool {
   name: string;
@@ -47,30 +43,18 @@ CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no explanations -
 
 If you don't have current information about recent tools in this category, return tools you know about but be honest in the downside about your knowledge limitations.`;
 
-export async function answerQuestion(question: string): Promise<QuestionAnswer> {
+export async function answerQuestion(
+  question: string,
+  model: LLMModel = 'claude-sonnet-4-5'
+): Promise<QuestionAnswer> {
   try {
-    console.log(`Answering question: "${question}"`);
+    console.log(`Answering question with ${model}: "${question}"`);
 
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
-      temperature: 0.3,
-      system: SCUTTLE_WHAT_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: `User question: "${question}"\n\nProvide 3-5 vetted SaaS tools that answer this question. Return ONLY the JSON object, no other text.`,
-        },
-      ],
-    });
+    const userMessage = `User question: "${question}"\n\nProvide 3-5 vetted SaaS tools that answer this question. Return ONLY the JSON object, no other text.`;
 
-    // Extract text from response
-    const textContent = response.content.find((block) => block.type === 'text');
-    if (!textContent || textContent.type !== 'text') {
-      throw new Error('No text content in response');
-    }
+    const response = await callLLM(model, SCUTTLE_WHAT_PROMPT, userMessage, 4096);
 
-    let jsonText = textContent.text.trim();
+    let jsonText = response.content.trim();
 
     // Remove markdown code blocks if present
     if (jsonText.startsWith('```json')) {
