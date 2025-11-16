@@ -130,6 +130,48 @@ export const scrapingJobs = pgTable('scraping_jobs', {
   statusIdx: index('scraping_jobs_status_idx').on(table.status),
 }));
 
+// ========== Q&A System Tables ==========
+
+// Questions asked by users
+export const questions = pgTable('questions', {
+  id: text('id').primaryKey(),
+  question: text('question').notNull(),
+  askedAt: timestamp('asked_at').defaultNow().notNull(),
+  // Store the answer as well
+  answer: jsonb('answer').$type<{
+    tools: Array<{
+      name: string;
+      description: string;
+      maker: string;
+      useCase: string;
+      proof: string;
+      downside: string;
+      link: string;
+    }>;
+    generatedAt: string;
+  }>(),
+}, (table) => ({
+  questionIdx: index('questions_question_idx').on(table.question),
+  askedAtIdx: index('questions_asked_at_idx').on(table.askedAt),
+}));
+
+// Subscriptions to questions
+export const questionSubscriptions = pgTable('question_subscriptions', {
+  id: text('id').primaryKey(),
+  email: text('email').notNull(),
+  questionId: text('question_id').references(() => questions.id).notNull(),
+  question: text('question').notNull(), // Denormalized for easier access
+  frequencyDays: integer('frequency_days').notNull(), // How many days between updates
+  lastSentAt: timestamp('last_sent_at'),
+  nextSendAt: timestamp('next_send_at').notNull(),
+  active: boolean('active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  emailIdx: index('question_subscriptions_email_idx').on(table.email),
+  nextSendAtIdx: index('question_subscriptions_next_send_at_idx').on(table.nextSendAt),
+  activeIdx: index('question_subscriptions_active_idx').on(table.active),
+}));
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   preferences: one(userPreferences, {
@@ -143,4 +185,8 @@ export const usersRelations = relations(users, ({ one, many }) => ({
 export const productsRelations = relations(products, ({ many }) => ({
   sources: many(productSources),
   interactions: many(userProductInteractions),
+}));
+
+export const questionsRelations = relations(questions, ({ many }) => ({
+  subscriptions: many(questionSubscriptions),
 }));

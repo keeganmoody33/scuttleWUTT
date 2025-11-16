@@ -25,12 +25,26 @@ export default async function Home() {
             Scuttle What
           </h1>
           <p className="text-xl text-gray-600 mb-6">
-            Your curated feed of the most promising products brought to market
+            Cut through the noise. Find SaaS tools that actually matter.
           </p>
-          <p className="text-gray-500">
-            We scrape Product Hunt, Twitter, and more to find the best new tools. <br />
-            Get personalized digests delivered to your inbox.
+          <p className="text-gray-500 mb-8">
+            Ask about any tool category. Get vetted recommendations with real social proof. <br />
+            Subscribe to answers and track how they change over time.
           </p>
+          <div className="flex gap-4 justify-center">
+            <a
+              href="/ask"
+              className="px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold text-lg"
+            >
+              Ask a Question
+            </a>
+            <a
+              href="#browse"
+              className="px-8 py-4 bg-white border-2 border-gray-300 text-gray-700 rounded-lg hover:border-blue-500 hover:text-blue-600 transition font-semibold text-lg"
+            >
+              Browse Tools
+            </a>
+          </div>
         </div>
 
         {topProducts.length === 0 ? (

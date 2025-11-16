@@ -10,7 +10,13 @@ export function Header() {
 
         <div className="flex items-center gap-6">
           <Link
-            href="/browse"
+            href="/ask"
+            className="text-gray-600 hover:text-gray-900 transition font-medium"
+          >
+            Ask
+          </Link>
+          <Link
+            href="/"
             className="text-gray-600 hover:text-gray-900 transition"
           >
             Browse
@@ -22,8 +28,8 @@ export function Header() {
             Settings
           </Link>
           <Link
-            href="/settings"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            href="/ask"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
           >
             Get Started
           </Link>
