@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db, questionSubscriptions } from '@/db';
 import { lte, eq } from 'drizzle-orm';
 import { answerQuestion, formatAnswerAsHTML } from '@/services/question-answering';
+import { sendSMSUpdate } from '@/services/sms';
 import { Resend } from 'resend';
 
 export const runtime = 'nodejs';
@@ -37,21 +38,39 @@ export async function GET(request: NextRequest) {
 
     for (const subscription of dueSubscriptions) {
       try {
-        console.log(`Processing subscription ${subscription.id} for: ${subscription.email}`);
+        console.log(`Processing subscription ${subscription.id} for: ${subscription.email || subscription.phone}`);
 
         // Re-generate answer for the question
         const answer = await answerQuestion(subscription.question);
 
-        // Generate email HTML
-        const html = formatAnswerAsHTML(answer, subscription.question);
+        // Send based on delivery method
+        const deliveryMethod = subscription.deliveryMethod || 'email';
 
-        // Send email
-        await resend.emails.send({
-          from: 'Scuttle What <updates@scuttlewhat.com>',
-          to: subscription.email,
-          subject: `Scuttle What Update: ${subscription.question}`,
-          html,
-        });
+        if (deliveryMethod === 'email' || deliveryMethod === 'both') {
+          if (subscription.email) {
+            // Generate email HTML
+            const html = formatAnswerAsHTML(answer, subscription.question);
+
+            // Send email
+            await resend.emails.send({
+              from: 'Scuttle What <updates@scuttlewhat.com>',
+              to: subscription.email,
+              subject: `Scuttle What Update: ${subscription.question}`,
+              html,
+            });
+
+            console.log(`✓ Sent email to ${subscription.email}`);
+          }
+        }
+
+        if (deliveryMethod === 'sms' || deliveryMethod === 'both') {
+          if (subscription.phone) {
+            // Send SMS
+            await sendSMSUpdate(subscription.phone, subscription.question, answer);
+
+            console.log(`✓ Sent SMS to ${subscription.phone}`);
+          }
+        }
 
         // Update subscription
         const nextSendAt = new Date(
@@ -66,7 +85,7 @@ export async function GET(request: NextRequest) {
           })
           .where(eq(questionSubscriptions.id, subscription.id));
 
-        console.log(`✓ Sent update to ${subscription.email}, next update: ${nextSendAt}`);
+        console.log(`✓ Updated subscription, next update: ${nextSendAt}`);
 
         results.sent++;
       } catch (error) {

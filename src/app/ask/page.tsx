@@ -31,7 +31,9 @@ export default function AskPage() {
 
   // Subscription state
   const [showSubscribe, setShowSubscribe] = useState(false);
+  const [deliveryMethod, setDeliveryMethod] = useState<'email' | 'sms' | 'both'>('email');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [frequencyDays, setFrequencyDays] = useState(7); // Default to weekly
   const [subscribing, setSubscribing] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
@@ -72,7 +74,17 @@ export default function AskPage() {
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!email.trim() || !answer) return;
+    if (!answer) return;
+
+    // Validation based on delivery method
+    if ((deliveryMethod === 'email' || deliveryMethod === 'both') && !email.trim()) {
+      alert('Email is required for email delivery');
+      return;
+    }
+    if ((deliveryMethod === 'sms' || deliveryMethod === 'both') && !phone.trim()) {
+      alert('Phone number is required for SMS delivery');
+      return;
+    }
 
     setSubscribing(true);
 
@@ -81,7 +93,9 @@ export default function AskPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: email.trim(),
+          email: email.trim() || undefined,
+          phone: phone.trim() || undefined,
+          deliveryMethod,
           questionId: answer.questionId,
           question: answer.question,
           frequencyDays,
@@ -95,6 +109,7 @@ export default function AskPage() {
 
       setSubscribed(true);
       setEmail('');
+      setPhone('');
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to subscribe');
     } finally {
@@ -235,14 +250,68 @@ export default function AskPage() {
                 </p>
 
                 <form onSubmit={handleSubscribe} className="space-y-3">
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="your@email.com"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      How do you want to receive updates?
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setDeliveryMethod('email')}
+                        className={`px-4 py-2 rounded-lg border-2 transition ${
+                          deliveryMethod === 'email'
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold'
+                            : 'border-gray-300 text-gray-700 hover:border-blue-300'
+                        }`}
+                      >
+                        Email
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeliveryMethod('sms')}
+                        className={`px-4 py-2 rounded-lg border-2 transition ${
+                          deliveryMethod === 'sms'
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold'
+                            : 'border-gray-300 text-gray-700 hover:border-blue-300'
+                        }`}
+                      >
+                        SMS
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeliveryMethod('both')}
+                        className={`px-4 py-2 rounded-lg border-2 transition ${
+                          deliveryMethod === 'both'
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold'
+                            : 'border-gray-300 text-gray-700 hover:border-blue-300'
+                        }`}
+                      >
+                        Both
+                      </button>
+                    </div>
+                  </div>
+
+                  {(deliveryMethod === 'email' || deliveryMethod === 'both') && (
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required={deliveryMethod === 'email' || deliveryMethod === 'both'}
+                    />
+                  )}
+
+                  {(deliveryMethod === 'sms' || deliveryMethod === 'both') && (
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+1 (555) 123-4567"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required={deliveryMethod === 'sms' || deliveryMethod === 'both'}
+                    />
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">

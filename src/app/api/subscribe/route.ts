@@ -8,11 +8,27 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const SubscribeSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  email: z.string().email('Invalid email address').optional(),
+  phone: z.string().min(10, 'Invalid phone number').optional(),
+  deliveryMethod: z.enum(['email', 'sms', 'both']).default('email'),
   questionId: z.string().min(1, 'Question ID is required'),
   question: z.string().min(5, 'Question must be at least 5 characters'),
   frequencyDays: z.number().int().min(1).max(90, 'Frequency must be between 1 and 90 days'),
-});
+}).refine(
+  (data) => {
+    // Validate based on delivery method
+    if (data.deliveryMethod === 'email' || data.deliveryMethod === 'both') {
+      return !!data.email;
+    }
+    if (data.deliveryMethod === 'sms' || data.deliveryMethod === 'both') {
+      return !!data.phone;
+    }
+    return true;
+  },
+  {
+    message: 'Email required for email delivery, phone required for SMS delivery',
+  }
+);
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,14 +37,34 @@ export async function POST(request: NextRequest) {
     // Validate input
     const validatedData = SubscribeSchema.parse(body);
 
-    const { email, questionId, question, frequencyDays } = validatedData;
+    const { email, phone, deliveryMethod, questionId, question, frequencyDays } = validatedData;
 
-    console.log(`Processing subscription: ${email} for question "${question}" (every ${frequencyDays} days)`);
+    console.log(`Processing subscription: ${email || phone} via ${deliveryMethod} for question "${question}" (every ${frequencyDays} days)`);
 
-    // Check if this email is already subscribed to this question
+    // Format phone number if provided
+    let formattedPhone = phone;
+    if (phone) {
+      const { formatPhoneNumber, validatePhoneNumber } = await import('@/services/sms');
+      if (!validatePhoneNumber(phone)) {
+        return NextResponse.json(
+          { error: 'Invalid phone number format' },
+          { status: 400 }
+        );
+      }
+      formattedPhone = formatPhoneNumber(phone);
+    }
+
+    // Check if this contact is already subscribed to this question
     const existing = await db.query.questionSubscriptions.findFirst({
-      where: (subs, { and, eq }) =>
-        and(eq(subs.email, email), eq(subs.questionId, questionId), eq(subs.active, true)),
+      where: (subs, { and, eq, or }) =>
+        and(
+          or(
+            email ? eq(subs.email, email) : undefined,
+            formattedPhone ? eq(subs.phone, formattedPhone) : undefined
+          ),
+          eq(subs.questionId, questionId),
+          eq(subs.active, true)
+        ),
     });
 
     if (existing) {
@@ -36,6 +72,9 @@ export async function POST(request: NextRequest) {
       await db
         .update(questionSubscriptions)
         .set({
+          email: email || existing.email,
+          phone: formattedPhone || existing.phone,
+          deliveryMethod,
           frequencyDays,
           nextSendAt: new Date(Date.now() + frequencyDays * 24 * 60 * 60 * 1000),
         })
@@ -55,7 +94,9 @@ export async function POST(request: NextRequest) {
 
     await db.insert(questionSubscriptions).values({
       id: subscriptionId,
-      email,
+      email: email || null,
+      phone: formattedPhone || null,
+      deliveryMethod,
       questionId,
       question,
       frequencyDays,

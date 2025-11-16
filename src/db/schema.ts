@@ -155,10 +155,15 @@ export const questions = pgTable('questions', {
   askedAtIdx: index('questions_asked_at_idx').on(table.askedAt),
 }));
 
+// Delivery method enum
+export const deliveryMethodEnum = pgEnum('delivery_method', ['email', 'sms', 'both']);
+
 // Subscriptions to questions
 export const questionSubscriptions = pgTable('question_subscriptions', {
   id: text('id').primaryKey(),
-  email: text('email').notNull(),
+  email: text('email'), // Nullable - only required if delivery method includes email
+  phone: text('phone'), // Nullable - only required if delivery method includes SMS
+  deliveryMethod: deliveryMethodEnum('delivery_method').notNull().default('email'),
   questionId: text('question_id').references(() => questions.id).notNull(),
   question: text('question').notNull(), // Denormalized for easier access
   frequencyDays: integer('frequency_days').notNull(), // How many days between updates
@@ -168,6 +173,7 @@ export const questionSubscriptions = pgTable('question_subscriptions', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => ({
   emailIdx: index('question_subscriptions_email_idx').on(table.email),
+  phoneIdx: index('question_subscriptions_phone_idx').on(table.phone),
   nextSendAtIdx: index('question_subscriptions_next_send_at_idx').on(table.nextSendAt),
   activeIdx: index('question_subscriptions_active_idx').on(table.active),
 }));
