@@ -38,6 +38,13 @@ export default function AskPage() {
   const [subscribing, setSubscribing] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
 
+  // Verification state
+  const [showVerification, setShowVerification] = useState(false);
+  const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [verifying, setVerifying] = useState(false);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
+
   const handleAsk = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -107,13 +114,73 @@ export default function AskPage() {
         throw new Error(data.error || 'Failed to subscribe');
       }
 
-      setSubscribed(true);
-      setEmail('');
-      setPhone('');
+      const data = await response.json();
+
+      // Show verification step
+      setSubscriptionId(data.subscriptionId);
+      setShowVerification(true);
+      setShowSubscribe(false);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to subscribe');
     } finally {
       setSubscribing(false);
+    }
+  };
+
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!subscriptionId || !verificationCode.trim()) return;
+
+    setVerifying(true);
+    setVerificationError(null);
+
+    try {
+      const response = await fetch('/api/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subscriptionId,
+          code: verificationCode.trim(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to verify');
+      }
+
+      // Success!
+      setSubscribed(true);
+      setShowVerification(false);
+      setVerificationCode('');
+      setEmail('');
+      setPhone('');
+    } catch (err) {
+      setVerificationError(err instanceof Error ? err.message : 'Failed to verify');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    if (!subscriptionId) return;
+
+    try {
+      const response = await fetch('/api/verify', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscriptionId }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to resend code');
+      }
+
+      alert('Verification code resent!');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to resend code');
     }
   };
 
@@ -341,20 +408,75 @@ export default function AskPage() {
               </div>
             )}
 
+            {/* Verification Step */}
+            {showVerification && !subscribed && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-blue-600" />
+                  Verify your {deliveryMethod === 'email' ? 'email' : deliveryMethod === 'sms' ? 'phone' : 'contact'}
+                </h3>
+                <p className="text-gray-600 mb-4 text-sm">
+                  We sent a 6-digit code to {deliveryMethod === 'email' ? email : deliveryMethod === 'sms' ? phone : `${email} and ${phone}`}.
+                  Enter it below to activate your subscription.
+                </p>
+
+                {verificationError && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+                    {verificationError}
+                  </div>
+                )}
+
+                <form onSubmit={handleVerify} className="space-y-3">
+                  <input
+                    type="text"
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="Enter 6-digit code"
+                    maxLength={6}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-2xl tracking-widest font-mono"
+                    required
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={verifying || verificationCode.length !== 6}
+                    className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition font-semibold"
+                  >
+                    {verifying ? 'Verifying...' : 'Verify & Activate'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleResendCode}
+                    className="w-full px-6 py-2 text-blue-600 hover:text-blue-700 text-sm transition"
+                  >
+                    Didn't receive the code? Resend
+                  </button>
+                </form>
+
+                <p className="mt-4 text-xs text-gray-500 text-center">
+                  Code expires in 10 minutes
+                </p>
+              </div>
+            )}
+
             {/* Subscribed Confirmation */}
             {subscribed && (
               <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
                 <CheckCircle className="w-12 h-12 text-green-600 mx-auto mb-3" />
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  You're subscribed!
+                  You're verified & subscribed!
                 </h3>
                 <p className="text-gray-600 text-sm">
-                  We'll email you updates for "{answer.question}" every{' '}
+                  We'll send you updates for "{answer?.question}" every{' '}
                   {frequencyDays === 1
                     ? 'day'
                     : frequencyDays === 7
                     ? 'week'
                     : `${frequencyDays} days`}
+                  {deliveryMethod === 'email' && ' via email'}
+                  {deliveryMethod === 'sms' && ' via SMS'}
+                  {deliveryMethod === 'both' && ' via email and SMS'}
                   .
                 </p>
               </div>

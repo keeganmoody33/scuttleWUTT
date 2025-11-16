@@ -88,9 +88,14 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Create new subscription
+    // Create new subscription (unverified)
     const subscriptionId = generateId('sub');
     const nextSendAt = new Date(Date.now() + frequencyDays * 24 * 60 * 60 * 1000);
+
+    // Generate verification code
+    const { generateVerificationCode, getCodeExpirationTime } = await import('@/services/verification');
+    const verificationCode = generateVerificationCode();
+    const verificationCodeExpiresAt = getCodeExpirationTime();
 
     await db.insert(questionSubscriptions).values({
       id: subscriptionId,
@@ -101,15 +106,64 @@ export async function POST(request: NextRequest) {
       question,
       frequencyDays,
       nextSendAt,
+      verified: false, // Not verified yet
+      verificationCode,
+      verificationCodeExpiresAt,
+      verificationSentAt: new Date(),
       active: true,
       createdAt: new Date(),
     });
 
-    console.log(`✓ Created subscription: ${subscriptionId}`);
+    // Send verification code
+    if (deliveryMethod === 'email' || deliveryMethod === 'both') {
+      if (email) {
+        // Send email verification
+        const { Resend } = await import('resend');
+        const resend = new Resend(process.env.RESEND_API_KEY);
+
+        await resend.emails.send({
+          from: 'Scuttle What <verify@scuttlewhat.com>',
+          to: email,
+          subject: 'Verify your Scuttle What subscription',
+          html: `
+            <h2>Verify your subscription</h2>
+            <p>Your verification code is:</p>
+            <h1 style="font-size: 32px; letter-spacing: 8px; font-family: monospace;">${verificationCode}</h1>
+            <p>This code expires in 10 minutes.</p>
+            <p>Enter this code to activate your subscription to: "${question}"</p>
+          `,
+        });
+
+        console.log(`✓ Sent email verification code to ${email}`);
+      }
+    }
+
+    if (deliveryMethod === 'sms' || deliveryMethod === 'both') {
+      if (formattedPhone) {
+        // Send SMS verification
+        const { sendSMSUpdate } = await import('@/services/sms');
+        const twilio = (await import('twilio')).default;
+        const twilioClient = twilio(
+          process.env.TWILIO_ACCOUNT_SID,
+          process.env.TWILIO_AUTH_TOKEN
+        );
+
+        await twilioClient.messages.create({
+          body: `Scuttle What verification code: ${verificationCode}\n\nEnter this code to activate your subscription. Expires in 10 minutes.`,
+          from: process.env.TWILIO_PHONE_NUMBER,
+          to: formattedPhone,
+        });
+
+        console.log(`✓ Sent SMS verification code to ${formattedPhone}`);
+      }
+    }
+
+    console.log(`✓ Created subscription: ${subscriptionId} (unverified)`);
 
     return NextResponse.json({
-      message: 'Subscription created successfully',
+      message: 'Verification code sent. Please check your email/phone.',
       subscriptionId,
+      requiresVerification: true,
       nextUpdateDate: nextSendAt,
     });
   } catch (error) {

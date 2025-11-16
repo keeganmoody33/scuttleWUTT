@@ -167,6 +167,13 @@ export const questionSubscriptions = pgTable('question_subscriptions', {
   questionId: text('question_id').references(() => questions.id).notNull(),
   question: text('question').notNull(), // Denormalized for easier access
   frequencyDays: integer('frequency_days').notNull(), // How many days between updates
+
+  // Verification fields
+  verified: boolean('verified').default(false).notNull(),
+  verificationCode: text('verification_code'), // 6-digit code for verification
+  verificationCodeExpiresAt: timestamp('verification_code_expires_at'), // Code expires after 10 mins
+  verificationSentAt: timestamp('verification_sent_at'), // When we sent the code
+
   lastSentAt: timestamp('last_sent_at'),
   nextSendAt: timestamp('next_send_at').notNull(),
   active: boolean('active').default(true).notNull(),
@@ -176,6 +183,7 @@ export const questionSubscriptions = pgTable('question_subscriptions', {
   phoneIdx: index('question_subscriptions_phone_idx').on(table.phone),
   nextSendAtIdx: index('question_subscriptions_next_send_at_idx').on(table.nextSendAt),
   activeIdx: index('question_subscriptions_active_idx').on(table.active),
+  verifiedIdx: index('question_subscriptions_verified_idx').on(table.verified),
 }));
 
 // Relations

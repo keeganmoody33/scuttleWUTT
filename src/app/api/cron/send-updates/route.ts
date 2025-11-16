@@ -20,10 +20,14 @@ export async function GET(request: NextRequest) {
 
     console.log('Running subscription update cron job...');
 
-    // Get all active subscriptions that are due for an update
+    // Get all active AND VERIFIED subscriptions that are due for an update
     const dueSubscriptions = await db.query.questionSubscriptions.findMany({
       where: (subs, { and, lte, eq }) =>
-        and(eq(subs.active, true), lte(subs.nextSendAt, new Date())),
+        and(
+          eq(subs.active, true),
+          eq(subs.verified, true), // ONLY send to verified subscriptions
+          lte(subs.nextSendAt, new Date())
+        ),
       limit: 100, // Process 100 at a time
     });
 
