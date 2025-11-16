@@ -4,6 +4,14 @@ import { lte, eq } from 'drizzle-orm';
 import { answerQuestion, formatAnswerAsHTML } from '@/services/question-answering';
 import { sendSMSUpdate } from '@/services/sms';
 import { Resend } from 'resend';
+import {
+  createSnapshot,
+  getLatestSnapshot,
+  compareSnapshots,
+  formatDiffAsHTML,
+  formatDiffAsText,
+  hasSignificantChanges,
+} from '@/services/snapshots';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -44,16 +52,69 @@ export async function GET(request: NextRequest) {
       try {
         console.log(`Processing subscription ${subscription.id} for: ${subscription.email || subscription.phone}`);
 
+        // Get the latest snapshot for this question (to compare changes)
+        const latestSnapshot = await getLatestSnapshot(subscription.questionId);
+
         // Re-generate answer for the question
         const answer = await answerQuestion(subscription.question);
+
+        // Create a new snapshot
+        const snapshotId = await createSnapshot(
+          subscription.questionId,
+          subscription.question,
+          answer,
+          'claude-sonnet-4-5'
+        );
+
+        // Compare with previous snapshot to detect changes
+        let diff = null;
+        let hasChanges = true; // Send first update always
+
+        if (latestSnapshot) {
+          diff = compareSnapshots(latestSnapshot, { answer });
+          hasChanges = hasSignificantChanges(diff);
+
+          if (!hasChanges) {
+            console.log(`No significant changes for ${subscription.questionId}, skipping send`);
+
+            // Still update next send time even if we skip
+            const nextSendAt = new Date(
+              Date.now() + subscription.frequencyDays * 24 * 60 * 60 * 1000
+            );
+
+            await db
+              .update(questionSubscriptions)
+              .set({
+                lastSentAt: new Date(),
+                nextSendAt,
+              })
+              .where(eq(questionSubscriptions.id, subscription.id));
+
+            results.processed++;
+            continue; // Skip to next subscription
+          }
+        }
+
+        console.log(`Significant changes detected, sending update...`);
 
         // Send based on delivery method
         const deliveryMethod = subscription.deliveryMethod || 'email';
 
         if (deliveryMethod === 'email' || deliveryMethod === 'both') {
           if (subscription.email) {
-            // Generate email HTML
-            const html = formatAnswerAsHTML(answer, subscription.question);
+            // Generate email HTML with changes highlighted
+            let html = formatAnswerAsHTML(answer, subscription.question);
+
+            // If there's a diff, prepend the "What Changed" section
+            if (diff && latestSnapshot) {
+              const changesSummary = `
+                <div style="background-color: #f3f4f6; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+                  <h2 style="margin: 0 0 12px 0; font-size: 18px; color: #1f2937;">📊 What Changed Since Last Update</h2>
+                  ${formatDiffAsHTML(diff)}
+                </div>
+              `;
+              html = changesSummary + html;
+            }
 
             // Send email
             await resend.emails.send({
@@ -69,8 +130,16 @@ export async function GET(request: NextRequest) {
 
         if (deliveryMethod === 'sms' || deliveryMethod === 'both') {
           if (subscription.phone) {
-            // Send SMS
-            await sendSMSUpdate(subscription.phone, subscription.question, answer);
+            // For SMS, include a brief changes summary if available
+            let smsMessage = '';
+
+            if (diff) {
+              const diffText = formatDiffAsText(diff);
+              smsMessage = `Changes:\n${diffText}\n\n`;
+            }
+
+            // Send SMS with changes
+            await sendSMSUpdate(subscription.phone, subscription.question, answer, smsMessage);
 
             console.log(`✓ Sent SMS to ${subscription.phone}`);
           }

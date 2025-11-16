@@ -33,14 +33,20 @@ export function formatAnswerForSMS(answer: QuestionAnswer, question: string): st
 export async function sendSMSUpdate(
   phone: string,
   question: string,
-  answer: QuestionAnswer
+  answer: QuestionAnswer,
+  changesSummary?: string
 ): Promise<void> {
   if (!TWILIO_PHONE_NUMBER) {
     throw new Error('TWILIO_PHONE_NUMBER not configured');
   }
 
   // Format answer for SMS
-  const body = formatAnswerForSMS(answer, question);
+  let body = formatAnswerForSMS(answer, question);
+
+  // Prepend changes summary if provided
+  if (changesSummary) {
+    body = changesSummary + body;
+  }
 
   // Check if message is too long (SMS limit is 1600 chars)
   if (body.length > 1600) {

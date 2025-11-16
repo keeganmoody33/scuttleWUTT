@@ -137,7 +137,7 @@ export const questions = pgTable('questions', {
   id: text('id').primaryKey(),
   question: text('question').notNull(),
   askedAt: timestamp('asked_at').defaultNow().notNull(),
-  // Store the answer as well
+  // Store the LATEST answer (for backward compatibility)
   answer: jsonb('answer').$type<{
     tools: Array<{
       name: string;
@@ -153,6 +153,32 @@ export const questions = pgTable('questions', {
 }, (table) => ({
   questionIdx: index('questions_question_idx').on(table.question),
   askedAtIdx: index('questions_asked_at_idx').on(table.askedAt),
+}));
+
+// Answer snapshots - track how answers change over time
+export const answerSnapshots = pgTable('answer_snapshots', {
+  id: text('id').primaryKey(),
+  questionId: text('question_id').references(() => questions.id).notNull(),
+  question: text('question').notNull(), // Denormalized
+  answer: jsonb('answer').$type<{
+    tools: Array<{
+      name: string;
+      description: string;
+      maker: string;
+      useCase: string;
+      proof: string;
+      downside: string;
+      link: string;
+    }>;
+    generatedAt: string;
+  }>().notNull(),
+  modelUsed: text('model_used').default('claude-sonnet-4-5').notNull(), // Track which model generated this
+  snapshotDate: timestamp('snapshot_date').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  questionIdIdx: index('answer_snapshots_question_id_idx').on(table.questionId),
+  snapshotDateIdx: index('answer_snapshots_snapshot_date_idx').on(table.snapshotDate),
+  modelUsedIdx: index('answer_snapshots_model_used_idx').on(table.modelUsed),
 }));
 
 // Delivery method enum
@@ -203,4 +229,12 @@ export const productsRelations = relations(products, ({ many }) => ({
 
 export const questionsRelations = relations(questions, ({ many }) => ({
   subscriptions: many(questionSubscriptions),
+  snapshots: many(answerSnapshots),
+}));
+
+export const answerSnapshotsRelations = relations(answerSnapshots, ({ one }) => ({
+  question: one(questions, {
+    fields: [answerSnapshots.questionId],
+    references: [questions.id],
+  }),
 }));

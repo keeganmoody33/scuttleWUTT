@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { answerQuestion } from '@/services/question-answering';
 import { db, questions } from '@/db';
 import { generateId } from '@/lib/utils';
+import { createSnapshot } from '@/services/snapshots';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,6 +41,11 @@ export async function POST(request: NextRequest) {
     });
 
     console.log(`✓ Question answered and stored with ID: ${questionId}`);
+
+    // Create initial snapshot
+    await createSnapshot(questionId, question, answer, 'claude-sonnet-4-5');
+
+    console.log(`✓ Created initial snapshot for question ${questionId}`);
 
     return NextResponse.json({
       questionId,

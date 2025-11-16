@@ -304,6 +304,24 @@ export default function AskPage() {
               ))}
             </div>
 
+            {/* Timeline Link */}
+            <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
+              <div>
+                <h4 className="font-semibold text-gray-900 text-sm">
+                  Track how this answer evolves over time
+                </h4>
+                <p className="text-xs text-gray-600 mt-1">
+                  See what tools come and go, and how rankings change
+                </p>
+              </div>
+              <Link
+                href={`/question/${answer.questionId}/timeline`}
+                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition font-medium text-sm whitespace-nowrap"
+              >
+                View Timeline →
+              </Link>
+            </div>
+
             {/* Subscribe Section */}
             {showSubscribe && !subscribed && (
               <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-6">
