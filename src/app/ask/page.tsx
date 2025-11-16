@@ -21,6 +21,30 @@ interface Answer {
     tools: Tool[];
     generatedAt: string;
   };
+  trustBadge?: {
+    modelsUsed: number;
+    modelsQueried: number;
+    consensusScore: number;
+    diversityScore: number;
+    message: string;
+    breakdown: {
+      unanimous: number;
+      majority: number;
+      unique: number;
+    };
+  };
+  signals?: {
+    marketIntent: {
+      score: number;
+      trend: string;
+      source: string;
+    };
+    marketSaturation: {
+      score: number;
+      competitorsFound: number;
+    };
+  };
+  methodologyUrl?: string;
 }
 
 export default function AskPage() {
@@ -58,7 +82,7 @@ export default function AskPage() {
     setSubscribed(false);
 
     try {
-      const response = await fetch('/api/ask', {
+      const response = await fetch('/api/consensus', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: question.trim() }),
@@ -316,6 +340,104 @@ export default function AskPage() {
                 </div>
               ))}
             </div>
+
+            {/* Trust Badge - Transparency Signals */}
+            {answer.trustBadge && (
+              <div className="bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-200 rounded-xl p-6">
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="flex-shrink-0 w-12 h-12 bg-green-600 text-white rounded-full flex items-center justify-center font-bold text-xl">
+                    ✓
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                      Cross-Verified Answer
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      {answer.trustBadge.message}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Consensus Metrics */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div className="bg-white/70 rounded-lg p-3 border border-green-200">
+                    <div className="text-xs font-semibold text-gray-600 mb-1">Consensus</div>
+                    <div className="text-2xl font-bold text-green-700">
+                      {answer.trustBadge.consensusScore}%
+                    </div>
+                  </div>
+                  <div className="bg-white/70 rounded-lg p-3 border border-blue-200">
+                    <div className="text-xs font-semibold text-gray-600 mb-1">Models Used</div>
+                    <div className="text-2xl font-bold text-blue-700">
+                      {answer.trustBadge.modelsUsed}/{answer.trustBadge.modelsQueried}
+                    </div>
+                  </div>
+                  <div className="bg-white/70 rounded-lg p-3 border border-purple-200">
+                    <div className="text-xs font-semibold text-gray-600 mb-1">Diversity</div>
+                    <div className="text-2xl font-bold text-purple-700">
+                      {answer.trustBadge.diversityScore}%
+                    </div>
+                  </div>
+                  <div className="bg-white/70 rounded-lg p-3 border border-orange-200">
+                    <div className="text-xs font-semibold text-gray-600 mb-1">Agreement</div>
+                    <div className="text-sm font-bold text-orange-700 mt-1">
+                      {answer.trustBadge.breakdown.unanimous} unanimous<br/>
+                      {answer.trustBadge.breakdown.majority} majority
+                    </div>
+                  </div>
+                </div>
+
+                {/* Market Signals */}
+                {answer.signals && (
+                  <div className="bg-white/70 rounded-lg p-4 mb-4 border border-gray-200">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Market Signals</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-semibold text-gray-600">Market Intent</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                            answer.signals.marketIntent.trend === 'rising'
+                              ? 'bg-green-100 text-green-700'
+                              : answer.signals.marketIntent.trend === 'falling'
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            {answer.signals.marketIntent.trend}
+                          </span>
+                        </div>
+                        <div className="text-lg font-bold text-gray-900">
+                          {answer.signals.marketIntent.score}/100
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          Source: {answer.signals.marketIntent.source.replace('_', ' ')}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-semibold text-gray-600 mb-1">Market Saturation</div>
+                        <div className="text-lg font-bold text-gray-900">
+                          {answer.signals.marketSaturation.score}%
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {answer.signals.marketSaturation.competitorsFound} tools analyzed
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Methodology Link */}
+                {answer.methodologyUrl && (
+                  <div className="text-center">
+                    <Link
+                      href={answer.methodologyUrl}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition text-sm font-medium text-gray-700 hover:text-blue-700"
+                    >
+                      View Full Methodology & Model Comparison →
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Timeline Link */}
             <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">

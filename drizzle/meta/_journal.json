@@ -15,6 +15,13 @@
       "when": 1763316505706,
       "tag": "0001_sloppy_firestar",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1763322920846,
+      "tag": "0002_last_chat",
+      "breakpoints": true
     }
   ]
 }

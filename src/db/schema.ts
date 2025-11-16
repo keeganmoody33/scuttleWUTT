@@ -239,3 +239,99 @@ export const answerSnapshotsRelations = relations(answerSnapshots, ({ one }) => 
     references: [questions.id],
   }),
 }));
+
+// Opportunity Trackers - "Scuttle Alpha" (Door B - Pro Feature)
+// Tracks user ideas and monitors "opportunity window" (demand vs. saturation)
+export const opportunityTrackers = pgTable('opportunity_trackers', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').references(() => users.id).notNull(),
+  ideaName: text('idea_name').notNull(), // e.g., "AI Sales Performance Review Writer"
+  ideaDescription: text('idea_description'), // Optional detailed description
+  keywords: jsonb('keywords').$type<string[]>().notNull(), // Keywords to track (e.g., ["ai performance review", "sales coaching ai"])
+
+  // Market Intent Signal (from external proxy like Google Trends)
+  intentScore: integer('intent_score').default(0), // 0-100, how much demand exists
+  intentTrend: text('intent_trend').default('flat'), // 'rising', 'falling', 'flat'
+
+  // Market Saturation Signal (from our LLM consensus engine)
+  saturationScore: integer('saturation_score').default(0), // 0-100, how many competitors exist
+  competitiveConsensus: integer('competitive_consensus').default(0), // % of models that found competitors
+
+  // Opportunity Window Analysis
+  opportunityScore: integer('opportunity_score').default(50), // Combined score: high demand + low saturation = high score
+  windowStatus: text('window_status').default('unknown'), // 'wide_open', 'emerging', 'closing', 'saturated'
+
+  // Alert settings
+  alertsEnabled: boolean('alerts_enabled').default(true).notNull(),
+  lastAlertSentAt: timestamp('last_alert_sent_at'),
+
+  // Tracking metadata
+  lastCheckedAt: timestamp('last_checked_at'),
+  nextCheckAt: timestamp('next_check_at').notNull(), // When to run the next analysis
+  checkFrequencyDays: integer('check_frequency_days').default(1).notNull(), // Default daily checks
+
+  active: boolean('active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index('opportunity_trackers_user_id_idx').on(table.userId),
+  nextCheckAtIdx: index('opportunity_trackers_next_check_at_idx').on(table.nextCheckAt),
+  activeIdx: index('opportunity_trackers_active_idx').on(table.active),
+}));
+
+// Brand Trackers - "Brand Intel Engine" (Door C - Enterprise Feature)
+// Tracks brands and runs predefined prompts across all LLMs daily
+export const brandTrackers = pgTable('brand_trackers', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').references(() => users.id).notNull(), // Enterprise customer
+  brandName: text('brand_name').notNull(), // e.g., "Salesforce"
+
+  // Prompts to track (e.g., "best CRM", "Salesforce vs HubSpot", "alternatives to Salesforce")
+  trackedPrompts: jsonb('tracked_prompts').$type<string[]>().notNull(),
+
+  // Metrics (calculated from snapshots)
+  shareOfVoice: integer('share_of_voice').default(0), // 0-100, % of models that recommend this brand
+  sentimentScore: integer('sentiment_score').default(50), // 0-100, positive vs negative mentions
+  consensusScore: integer('consensus_score').default(0), // 0-100, how much models agree on this brand
+
+  // Provider bias tracking
+  providerBias: jsonb('provider_bias').$type<{
+    provider: string;
+    sentiment: number; // -10 to +10
+    shareOfVoice: number; // 0-100
+  }[]>(),
+
+  // Alert settings
+  alertsEnabled: boolean('alerts_enabled').default(true).notNull(),
+  alertThreshold: integer('alert_threshold').default(10), // Alert if sentiment changes by this %
+  lastAlertSentAt: timestamp('last_alert_sent_at'),
+
+  // Tracking metadata
+  lastCheckedAt: timestamp('last_checked_at'),
+  nextCheckAt: timestamp('next_check_at').notNull(),
+  checkFrequencyDays: integer('check_frequency_days').default(1).notNull(), // Daily checks for enterprise
+
+  active: boolean('active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index('brand_trackers_user_id_idx').on(table.userId),
+  brandNameIdx: index('brand_trackers_brand_name_idx').on(table.brandName),
+  nextCheckAtIdx: index('brand_trackers_next_check_at_idx').on(table.nextCheckAt),
+  activeIdx: index('brand_trackers_active_idx').on(table.active),
+}));
+
+// Relations for new tables
+export const opportunityTrackersRelations = relations(opportunityTrackers, ({ one }) => ({
+  user: one(users, {
+    fields: [opportunityTrackers.userId],
+    references: [users.id],
+  }),
+}));
+
+export const brandTrackersRelations = relations(brandTrackers, ({ one }) => ({
+  user: one(users, {
+    fields: [brandTrackers.userId],
+    references: [users.id],
+  }),
+}));
