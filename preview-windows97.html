@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scuttle What - Windows 97 Preview</title>
+</head>
+<body style="margin: 0; padding: 0;">
+  <div id="root"></div>
+
+  <script>
+    const root = document.getElementById('root');
+
+    // State
+    let question = '';
+    let loading = false;
+    let answer = null;
+    let error = null;
+    let showGameOver = false;
+    let showResults = false;
+    let position = { x: 100, y: 100 };
+    let velocity = { x: 0.8, y: 0.6 };
+    let boxColor = '#FFFFFF';
+
+    function render() {
+      if (showGameOver) {
+        root.innerHTML = `
+          <div style="width:100vw;height:100vh;background:#000000;display:flex;align-items:center;justify-content:center;font-family:'Courier New',monospace;color:#FF0000;flex-direction:column;gap:20px">
+            <div style="font-size:72px;font-weight:bold;text-shadow:4px 4px 0px rgba(255,0,0,0.5);animation:blink 1s infinite">
+              GAME OVER
+            </div>
+            <div style="font-size:24px;color:#FFFFFF;text-align:center">
+              YOU CLOSED THE WINDOW<br/>YOU LOSE
+            </div>
+            <div style="font-size:18px;color:#00FF00;margin-top:40px;border:2px solid #00FF00;padding:10px 20px;cursor:pointer" onclick="window.location.reload()">
+              PRESS F5 TO CONTINUE
+            </div>
+            <div style="font-size:12px;color:#888888;margin-top:20px">
+              (or just refresh the page)
+            </div>
+            <style>
+              @keyframes blink {
+                0%, 49% { opacity: 1; }
+                50%, 100% { opacity: 0; }
+              }
+            </style>
+          </div>
+        `;
+        return;
+      }
+
+      root.innerHTML = `
+        <div style="width:100vw;height:100vh;background:#008080;overflow:hidden;font-family:'MS Sans Serif',Arial,sans-serif;position:relative">
+          <!-- Windows 95 Taskbar -->
+          <div style="position:fixed;bottom:0;left:0;right:0;height:40px;background:#C0C0C0;border-top:2px solid #FFFFFF;display:flex;align-items:center;padding:0 4px;z-index:1000">
+            <button style="background:#C0C0C0;border:2px outset #FFFFFF;padding:4px 8px;font-family:'MS Sans Serif',Arial,sans-serif;font-size:14px;font-weight:bold;cursor:pointer;display:flex;align-items:center;gap:6px">
+              <span style="font-size:20px">🪟</span>Start
+            </button>
+            <div style="flex:1;margin-left:4px;background:#C0C0C0;border:2px inset #808080;height:32px;display:flex;align-items:center;padding:0 4px">
+              <div style="background:#C0C0C0;border:1px outset #FFFFFF;padding:2px 8px;font-size:12px">
+                📄 Scuttle What - Ask
+              </div>
+            </div>
+            <div style="display:flex;gap:2px;background:#C0C0C0;border:2px inset #808080;padding:2px 4px">
+              <div style="font-size:12px" id="clock">🔊 ⏰ </div>
+            </div>
+          </div>
+
+          <!-- Floating/Bouncing Search Box -->
+          <div id="searchBox" style="position:absolute;left:${position.x}px;top:${position.y}px;width:400px;background:#C0C0C0;border:3px outset #FFFFFF;box-shadow:4px 4px 0px rgba(0,0,0,0.5);transition:background-color 0.3s">
+            <!-- Title Bar -->
+            <div style="background:linear-gradient(to right,#000080,#1084D0);color:#FFFFFF;padding:3px 4px;display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:bold">
+              <div style="display:flex;align-items:center;gap:4px">
+                <span>📝</span>
+                <span>Scuttle What - Ask Question</span>
+              </div>
+              <div style="display:flex;gap:2px">
+                <button style="background:#C0C0C0;border:1px outset #FFFFFF;width:16px;height:14px;font-size:10px;cursor:pointer;padding:0;line-height:1">_</button>
+                <button style="background:#C0C0C0;border:1px outset #FFFFFF;width:16px;height:14px;font-size:10px;cursor:pointer;padding:0;line-height:1">□</button>
+                <button onclick="handleClose()" style="background:#C0C0C0;border:1px outset #FFFFFF;width:16px;height:14px;font-size:10px;cursor:pointer;padding:0;line-height:1">✕</button>
+              </div>
+            </div>
+
+            <!-- Window Content -->
+            <div style="padding:16px;background:${boxColor};border-top:1px solid #808080">
+              <div style="font-size:14px;font-weight:bold;margin-bottom:12px;color:#000000">
+                Which SaaS tool should you actually use?
+              </div>
+              <div style="font-size:11px;margin-bottom:16px;color:#000000">
+                We ask 3 leading AI models (Claude, GPT-4o, DeepSeek), then show you only what they agree on.
+              </div>
+
+              <form onsubmit="handleAsk(event)">
+                <div style="margin-bottom:12px">
+                  <label style="font-size:11px;font-weight:bold;display:block;margin-bottom:4px;color:#000000">
+                    Enter your question:
+                  </label>
+                  <input
+                    type="text"
+                    id="questionInput"
+                    placeholder="e.g., Best CRM for small sales teams"
+                    style="width:100%;padding:4px;border:2px inset #808080;background:#FFFFFF;font-family:'MS Sans Serif',Arial,sans-serif;font-size:11px"
+                    value="${question}"
+                    oninput="question = this.value"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  style="background:#C0C0C0;border:2px outset #FFFFFF;padding:6px 24px;font-family:'MS Sans Serif',Arial,sans-serif;font-size:11px;cursor:pointer;font-weight:bold"
+                >
+                  OK
+                </button>
+              </form>
+
+              <div style="margin-top:12px;font-size:10px;color:#000000;border:1px solid #808080;padding:8px;background:#FFFFE0">
+                💡 <strong>Tip:</strong> Try "Best sales engagement tool" or "Salesforce vs HubSpot"
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Update clock
+      const clock = document.getElementById('clock');
+      if (clock) {
+        clock.textContent = '🔊 ⏰ ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+    }
+
+    function handleClose() {
+      showGameOver = true;
+      render();
+    }
+
+    function handleAsk(e) {
+      e.preventDefault();
+      alert('This is a static preview! The actual app would query 3 AI models here.\n\nConnect to the live server at localhost:3000/ask to see the full functionality.');
+    }
+
+    // Bouncing animation
+    function animate() {
+      if (showGameOver) return;
+
+      const boxWidth = 400;
+      const boxHeight = 200;
+      const windowWidth = window.innerWidth;
+      const windowHeight = window.innerHeight;
+
+      let newX = position.x + velocity.x;
+      let newY = position.y + velocity.y;
+
+      // Bounce off walls and change color
+      if (newX + boxWidth >= windowWidth || newX <= 0) {
+        velocity.x = -velocity.x;
+        boxColor = '#' + Math.floor(Math.random()*16777215).toString(16);
+      }
+      if (newY + boxHeight >= windowHeight || newY <= 60) {
+        velocity.y = -velocity.y;
+        boxColor = '#' + Math.floor(Math.random()*16777215).toString(16);
+      }
+
+      // Keep in bounds
+      position.x = Math.max(0, Math.min(newX, windowWidth - boxWidth));
+      position.y = Math.max(60, Math.min(newY, windowHeight - boxHeight));
+
+      render();
+      requestAnimationFrame(animate);
+    }
+
+    // Initial render and start animation
+    render();
+    animate();
+
+    // Update clock every second
+    setInterval(() => {
+      const clock = document.getElementById('clock');
+      if (clock) {
+        clock.textContent = '🔊 ⏰ ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+    }, 1000);
+  </script>
+</body>
+</html>
