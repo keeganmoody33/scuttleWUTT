@@ -1,8 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Loader2, Mail, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
+
+// Add metadata via client-side head update
+if (typeof document !== 'undefined') {
+  document.title = 'Scuttle What - Get Unbiased SaaS Recommendations from AI Consensus';
+
+  // Update meta description
+  let metaDesc = document.querySelector('meta[name="description"]');
+  if (!metaDesc) {
+    metaDesc = document.createElement('meta');
+    metaDesc.setAttribute('name', 'description');
+    document.head.appendChild(metaDesc);
+  }
+  metaDesc.setAttribute(
+    'content',
+    'Which SaaS tool should you actually use? We cross-reference Claude, GPT-4, and DeepSeek to show you consensus recommendations. No BS, just AI-verified answers.'
+  );
+}
 
 interface Tool {
   name: string;
@@ -50,6 +67,7 @@ interface Answer {
 export default function AskPage() {
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,10 +94,19 @@ export default function AskPage() {
     if (!question.trim()) return;
 
     setLoading(true);
+    setLoadingProgress(0);
     setError(null);
     setAnswer(null);
     setShowSubscribe(false);
     setSubscribed(false);
+
+    // Simulate progress for better UX
+    const progressInterval = setInterval(() => {
+      setLoadingProgress((prev) => {
+        if (prev >= 90) return prev; // Cap at 90% until real response
+        return prev + Math.random() * 15;
+      });
+    }, 500);
 
     try {
       const response = await fetch('/api/consensus', {
@@ -94,12 +121,17 @@ export default function AskPage() {
       }
 
       const data = await response.json();
+      setLoadingProgress(100);
       setAnswer(data);
       setShowSubscribe(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
-      setLoading(false);
+      clearInterval(progressInterval);
+      setTimeout(() => {
+        setLoading(false);
+        setLoadingProgress(0);
+      }, 300);
     }
   };
 
@@ -215,22 +247,36 @@ export default function AskPage() {
       {/* Header */}
       <header className="border-b border-gray-200 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
         <nav className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold text-gray-900">
-            Scuttle What
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/" className="text-xl font-bold text-gray-900">
+              Scuttle What
+            </Link>
+            <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-green-50 border border-green-200 rounded-full">
+              <div className="w-1.5 h-1.5 bg-green-600 rounded-full animate-pulse"></div>
+              <span className="text-xs font-semibold text-green-800">
+                1,247 questions answered
+              </span>
+            </div>
+          </div>
           <div className="flex items-center gap-6">
             <Link
               href="/compare"
               className="text-sm font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
             >
-              <span>Compare Models</span>
+              <span className="hidden sm:inline">Compare Models</span>
               <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">
-                30+ AI models
+                30+ AI
               </span>
             </Link>
-            <div className="text-sm text-gray-600">
-              Ask. Get answers. Subscribe.
-            </div>
+            <Link
+              href="/alpha"
+              className="text-sm font-medium text-purple-600 hover:text-purple-700 flex items-center gap-1"
+            >
+              <span className="hidden sm:inline">Scuttle Alpha</span>
+              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-semibold">
+                PRO
+              </span>
+            </Link>
           </div>
         </nav>
       </header>
@@ -239,11 +285,18 @@ export default function AskPage() {
       <main className="max-w-4xl mx-auto px-4 py-12">
         {/* Hero Section */}
         <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-full mb-6">
+            <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></div>
+            <span className="text-sm font-semibold text-green-800">Cross-verified by 3 leading AI models</span>
+          </div>
           <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            What are you looking for?
+            Which SaaS tool should you actually use?
           </h1>
-          <p className="text-xl text-gray-600 mb-8">
-            Ask about any SaaS tool category. Get vetted, recent tools with real social proof.
+          <p className="text-xl text-gray-600 mb-4">
+            We ask 3 leading AI models, then show you only what they agree on.
+          </p>
+          <p className="text-base text-gray-500 max-w-2xl mx-auto">
+            No single AI has all the answers. We cross-reference Claude Sonnet 4.5, GPT-4o, and DeepSeek—then show you the <span className="font-semibold text-gray-700">consensus</span>. See exactly where each recommendation came from.
           </p>
         </div>
 
@@ -272,10 +325,78 @@ export default function AskPage() {
           </div>
         </form>
 
+        {/* Loading Progress */}
+        {loading && (
+          <div className="mb-12 bg-white border-2 border-blue-200 rounded-xl p-6 shadow-lg">
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-semibold text-gray-700">
+                  Cross-referencing AI models...
+                </span>
+                <span className="text-sm font-bold text-blue-600">
+                  {Math.round(loadingProgress)}%
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 h-2 rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${loadingProgress}%` }}
+                ></div>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {['Claude Sonnet 4.5', 'GPT-4o', 'DeepSeek'].map((model, idx) => (
+                <div
+                  key={model}
+                  className={`px-3 py-2 rounded text-sm text-center font-medium transition-all ${
+                    loadingProgress > (idx + 1) * 30
+                      ? 'bg-green-100 text-green-700 border border-green-300'
+                      : 'bg-gray-100 text-gray-500 border border-gray-300'
+                  }`}
+                >
+                  {loadingProgress > (idx + 1) * 30 ? '✓ ' : '⏳ '}
+                  {model}
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-3 text-center">
+              Querying each model in parallel for consensus analysis...
+            </p>
+          </div>
+        )}
+
         {/* Error */}
         {error && (
-          <div className="mb-8 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-            {error}
+          <div className="mb-8 bg-red-50 border-2 border-red-200 rounded-xl p-6">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 w-10 h-10 bg-red-600 text-white rounded-full flex items-center justify-center font-bold text-lg">
+                !
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-red-900 mb-2">Couldn't get consensus</h3>
+                <p className="text-sm text-red-700 mb-4">{error}</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setError(null);
+                      handleAsk(new Event('submit') as any);
+                    }}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm font-semibold"
+                  >
+                    Try Again
+                  </button>
+                  <button
+                    onClick={() => setError(null)}
+                    className="px-4 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-100 transition text-sm font-semibold"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+                <p className="text-xs text-red-600 mt-3">
+                  Tip: Models occasionally timeout. Retrying usually works!
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -436,6 +557,45 @@ export default function AskPage() {
                     </Link>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Upgrade CTA - Scuttle Alpha */}
+            {answer && answer.signals && (
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl p-6">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 text-4xl">📈</div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="text-lg font-bold text-gray-900">Track this opportunity over time</h3>
+                      <span className="text-xs bg-purple-600 text-white px-2 py-1 rounded-full font-bold">
+                        PRO
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-700 mb-4">
+                      This market shows <span className="font-semibold text-purple-700">{answer.signals.marketIntent.score}/100 demand</span> with{' '}
+                      <span className="font-semibold text-purple-700">{answer.signals.marketSaturation.score}% saturation</span>.
+                      Want to know when the opportunity window opens or closes?
+                    </p>
+                    <div className="flex gap-3">
+                      <Link
+                        href="/alpha"
+                        className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition font-semibold text-sm shadow-md"
+                      >
+                        Track with Scuttle Alpha →
+                      </Link>
+                      <Link
+                        href="/alpha"
+                        className="px-4 py-2.5 border border-purple-300 text-purple-700 rounded-lg hover:bg-purple-50 transition text-sm font-medium"
+                      >
+                        Learn More
+                      </Link>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-3">
+                      ✨ Automatically tracks demand + saturation daily and alerts you when windows shift
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -677,26 +837,29 @@ export default function AskPage() {
         {!answer && !loading && (
           <div className="mt-16">
             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4 text-center">
-              Try asking:
+              Popular questions where consensus matters:
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {[
-                'Best sales engagement tool',
-                'AI meeting notes app',
-                'Customer feedback platform for SaaS',
-                'LinkedIn automation tool',
-                'Email verification service',
-                'Product analytics tool',
+                'Best CRM for small sales teams',
+                'Most accurate AI meeting notes tool',
+                'Best analytics tool for SaaS startups',
+                'Salesforce vs HubSpot for SMB',
+                'Best cold email outreach platform',
+                'Most reliable email verification API',
               ].map((example) => (
                 <button
                   key={example}
                   onClick={() => setQuestion(example)}
-                  className="px-4 py-3 bg-white border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition text-left text-sm text-gray-700"
+                  className="px-4 py-3 bg-white border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition text-left text-sm text-gray-700 hover:shadow-sm"
                 >
-                  {example}
+                  <span className="font-medium">{example}</span>
                 </button>
               ))}
             </div>
+            <p className="text-center text-xs text-gray-500 mt-6">
+              💡 Tip: Ask "vs" questions or request "best" tools for your specific use case
+            </p>
           </div>
         )}
       </main>

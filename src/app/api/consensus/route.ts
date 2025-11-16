@@ -44,13 +44,11 @@ export async function POST(request: NextRequest) {
     const demandSignal = await getDemandSignal([question]);
 
     // Step 2: Run across our curated "Consensus Models"
-    // These are the 5-7 most reliable, diverse models
+    // Optimized for speed: 3 high-quality, fast models with provider diversity
     const consensusModels: LLMModel[] = [
-      'claude-sonnet-4-5', // Anthropic's best
-      'gpt-4o', // OpenAI's best
-      'deepseek-chat', // Open source alternative
-      'gpt-4o-mini', // Fast/cheap backup
-      'claude-3-5-sonnet', // Anthropic backup
+      'claude-sonnet-4-5', // Anthropic - highest quality
+      'gpt-4o', // OpenAI - fast and reliable
+      'deepseek-chat', // DeepSeek - alternative perspective
     ];
 
     console.log(`[Consensus API] Running across ${consensusModels.length} models...`);
