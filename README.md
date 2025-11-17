@@ -95,6 +95,61 @@ npm run dev
 npm run scrape
 ```
 
+## 🔧 GitHub CLI Setup & Project Sync
+
+This project uses GitHub CLI for repository management and includes automated workflows to keep dependencies up to date.
+
+### Installing GitHub CLI
+
+```bash
+# macOS
+brew install gh
+
+# Authenticate (opens browser)
+gh auth login
+```
+
+### Keeping the Project Up to Date
+
+#### Quick Sync Commands
+
+```bash
+# Check sync status
+npm run sync:status
+
+# Fetch latest changes (doesn't merge)
+npm run sync:fetch
+
+# Pull and merge latest changes
+npm run sync:pull
+```
+
+#### Using the Sync Script
+
+For more detailed sync information, use the sync helper script:
+
+```bash
+# Check status (default)
+./scripts/sync.sh status
+
+# Fetch latest changes
+./scripts/sync.sh fetch
+
+# Pull latest changes
+./scripts/sync.sh pull
+
+# Full sync (status check + pull)
+./scripts/sync.sh full
+```
+
+### Automated Dependency Updates
+
+Dependabot is configured to automatically check for dependency updates weekly. You'll receive pull requests for:
+- npm package updates (production and development dependencies)
+- GitHub Actions updates
+
+Review and merge these PRs to keep dependencies secure and up to date.
+
 ## 📊 Roadmap
 
 - [ ] Core platform setup

@@ -13,7 +13,10 @@
     "scrape": "tsx src/scrapers/index.ts",
     "scrape:producthunt": "tsx src/scrapers/producthunt.ts",
     "scrape:twitter": "tsx src/scrapers/twitter.ts",
-    "digest:generate": "tsx src/jobs/generateDigests.ts"
+    "digest:generate": "tsx src/jobs/generateDigests.ts",
+    "sync:fetch": "git fetch origin",
+    "sync:pull": "git pull origin",
+    "sync:status": "git status && echo '' && echo 'Remote status:' && git fetch --dry-run 2>&1 | head -5"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.0",
