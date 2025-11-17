@@ -1,0 +1,471 @@
+/* ============================================
+   ScuttleWUTT - Windows 98 Retro Stylesheet
+   ============================================ */
+
+/* Import 98.css framework from CDN */
+@import url('https://unpkg.com/98.css');
+
+/* Windows 95 Font - W95FA */
+@font-face {
+  font-family: 'W95FA';
+  src: url('https://arnesava.github.io/W95font/w95fa.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* ============================================
+   CSS VARIABLES - Windows 98 Color System
+   ============================================ */
+
+:root {
+  /* Primary Button/Window Colors */
+  --button-face: #c0c0c0;
+  --button-highlight: #ffffff;
+  --button-shadow: #808080;
+  --button-dark-shadow: #000000;
+  --button-light: #dfdfdf;
+  --button-text: #000000;
+
+  /* Window Chrome Colors */
+  --window-frame: #0a246a;
+  --window-frame-inactive: #808080;
+
+  /* Sendak-Inspired Muted Vintage Color Palette */
+  --desktop-background: #5a1015; /* Deeper muted burgundy sky (more Sendak-like) */
+  --ocean-blue: #2b5266; /* Muted teal-blue ocean (less saturated) */
+  --ocean-texture: #1a3a4a; /* Deep desaturated ocean depths */
+  --ocean-highlight: #4a7b8f; /* Softer, vintage wave highlights */
+  --vintage-warmth: rgba(250, 235, 215, 0.03); /* Subtle sepia warmth overlay */
+
+  /* Accent Colors */
+  --link-blue: #0000ff;
+  --selection-blue: #000080;
+  --highlight-color: #000080;
+  --highlight-text: #ffffff;
+
+  /* Field/Input Colors */
+  --field-background: #ffffff;
+  --field-border-outer: #808080;
+  --field-border-inner: #000000;
+
+  /* Additional Palette */
+  --olive: #808000;
+  --red: #ff0000;
+  --yellow: #ffff00;
+  --green: #008000;
+  --teal: #008080;
+  --navy: #010081;
+  --hot-pink: #ff0081;
+  --light-gray: #c3c3c3;
+  --medium-gray: #818181;
+  --near-white: #fdffff;
+
+  /* Spacing System (4px base grid) */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+
+  /* Typography Scale */
+  --font-size-xs: 8px;
+  --font-size-sm: 10px;
+  --font-size-md: 11px;
+  --font-size-lg: 14px;
+  --font-size-xl: 18px;
+  --font-size-2xl: 24px;
+
+  /* Line Heights */
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.4;
+  --line-height-relaxed: 1.6;
+}
+
+/* ============================================
+   BASE STYLES - Windows 98 Foundation
+   ============================================ */
+
+body {
+  font-family: 'W95FA', 'MS Sans Serif', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: var(--font-size-md);
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--desktop-background);
+  color: var(--button-text);
+  line-height: var(--line-height-normal);
+}
+
+/* ============================================
+   WINDOWS 98 COMPONENTS
+   ============================================ */
+
+/* Window Container */
+.win98-window {
+  border: 2px solid;
+  border-color: var(--button-highlight) var(--button-shadow) var(--button-shadow) var(--button-highlight);
+  background: var(--button-face);
+  box-shadow: inset 1px 1px 0 var(--button-light),
+              inset -1px -1px 0 var(--button-dark-shadow);
+}
+
+/* Title Bar */
+.win98-title-bar {
+  background: linear-gradient(90deg, var(--window-frame) 0%, #1084d0 100%);
+  padding: 3px 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+}
+
+.win98-title-bar-text {
+  color: #ffffff;
+  font-weight: bold;
+  font-size: var(--font-size-md);
+  letter-spacing: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.win98-title-bar-controls {
+  display: flex;
+  gap: 2px;
+}
+
+.win98-title-bar-button {
+  width: 16px;
+  height: 14px;
+  padding: 0;
+  border: 1px solid;
+  border-color: var(--button-highlight) var(--button-shadow) var(--button-shadow) var(--button-highlight);
+  background: var(--button-face);
+  font-size: 8px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.win98-title-bar-button:active {
+  border-color: var(--button-shadow) var(--button-highlight) var(--button-highlight) var(--button-shadow);
+  padding: 1px 0 0 1px;
+}
+
+/* Window Body */
+.win98-window-body {
+  padding: var(--space-sm);
+  background: var(--button-face);
+}
+
+/* Status Bar */
+.win98-status-bar {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-top: 1px solid var(--button-shadow);
+  background: var(--button-face);
+}
+
+.win98-status-field {
+  border: 1px solid;
+  border-color: var(--button-shadow) var(--button-highlight) var(--button-highlight) var(--button-shadow);
+  padding: 2px 4px;
+  font-size: var(--font-size-md);
+  flex: 1;
+  background: var(--button-face);
+}
+
+/* Buttons */
+.win98-button {
+  min-width: 75px;
+  height: 23px;
+  padding: 0 12px;
+  border: 2px solid;
+  border-color: var(--button-highlight) var(--button-shadow) var(--button-shadow) var(--button-highlight);
+  background: var(--button-face);
+  box-shadow: inset 1px 1px 0 var(--button-light),
+              inset -1px -1px 0 var(--button-dark-shadow);
+  font-family: 'W95FA', 'MS Sans Serif', sans-serif;
+  font-size: var(--font-size-md);
+  color: var(--button-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.win98-button:hover:not(:disabled) {
+  background: var(--button-light);
+}
+
+.win98-button:active:not(:disabled) {
+  border-color: var(--button-shadow) var(--button-highlight) var(--button-highlight) var(--button-shadow);
+  box-shadow: inset -1px -1px 0 var(--button-light),
+              inset 1px 1px 0 var(--button-dark-shadow);
+  padding: 1px 11px 0 13px;
+}
+
+.win98-button:focus {
+  outline: 1px dotted var(--button-text);
+  outline-offset: -4px;
+}
+
+.win98-button:disabled {
+  color: var(--medium-gray);
+  cursor: not-allowed;
+}
+
+.win98-button-default {
+  border: 3px solid var(--button-text);
+  padding: 0 11px;
+}
+
+/* Input Fields */
+.win98-input {
+  border: 2px solid;
+  border-color: var(--button-shadow) var(--button-highlight) var(--button-highlight) var(--button-shadow);
+  box-shadow: inset -1px -1px 0 var(--button-light),
+              inset 1px 1px 0 var(--button-dark-shadow);
+  background: var(--field-background);
+  padding: 3px 4px;
+  font-family: 'W95FA', 'MS Sans Serif', sans-serif;
+  font-size: var(--font-size-md);
+  color: var(--button-text);
+}
+
+.win98-input:focus {
+  outline: none;
+}
+
+.win98-input::placeholder {
+  color: var(--medium-gray);
+}
+
+/* Field Border (for containing inputs) */
+.win98-field-border {
+  border: 2px solid;
+  border-color: var(--button-shadow) var(--button-highlight) var(--button-highlight) var(--button-shadow);
+  box-shadow: inset -1px -1px 0 var(--button-light),
+              inset 1px 1px 0 var(--button-dark-shadow);
+  background: var(--field-background);
+  padding: 3px 4px;
+}
+
+/* Group Box / Fieldset */
+.win98-groupbox {
+  border: 2px groove var(--button-shadow);
+  padding: var(--space-md);
+  margin: var(--space-md) 0;
+  background: var(--button-face);
+}
+
+.win98-groupbox legend {
+  padding: 0 var(--space-xs);
+  font-weight: normal;
+  font-size: var(--font-size-md);
+}
+
+/* Progress Bar */
+.win98-progress-bar {
+  height: 20px;
+  border: 2px solid;
+  border-color: var(--button-shadow) var(--button-highlight) var(--button-highlight) var(--button-shadow);
+  background: var(--field-background);
+  overflow: hidden;
+}
+
+.win98-progress-fill {
+  height: 100%;
+  background: var(--selection-blue);
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0px,
+    transparent 2px,
+    rgba(255, 255, 255, 0.3) 2px,
+    rgba(255, 255, 255, 0.3) 4px
+  );
+  transition: width 0.3s ease-out;
+}
+
+/* Desktop Background with Hand-Drawn Waves */
+.win98-desktop {
+  min-height: 100vh;
+  background: var(--desktop-background);
+  padding: var(--space-xl);
+  position: relative;
+  overflow: hidden;
+  transition: background-position 0.8s ease-out;
+}
+
+
+/* Simple Horizon - Burgundy Sky Above, Blue Ocean Below */
+.win98-desktop {
+  background: linear-gradient(180deg,
+    var(--desktop-background) 0%,
+    var(--desktop-background) 50%,
+    var(--ocean-blue) 50%,
+    var(--ocean-texture) 100%
+  );
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='paper-grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23paper-grain)' opacity='0.08'/%3E%3C/svg%3E"),
+    linear-gradient(180deg,
+      var(--desktop-background) 0%,
+      var(--desktop-background) 50%,
+      var(--ocean-blue) 50%,
+      var(--ocean-texture) 100%
+    );
+  background-blend-mode: multiply, normal;
+}
+
+/* Ensure content is above background */
+.win98-desktop > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* Menu Bar */
+.win98-menu-bar {
+  background: var(--button-face);
+  border-bottom: 2px solid;
+  border-color: var(--button-highlight) var(--button-shadow);
+  padding: 2px;
+  display: flex;
+  gap: 4px;
+  font-size: var(--font-size-md);
+}
+
+.win98-menu-item {
+  padding: 2px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.win98-menu-item:hover {
+  background: var(--selection-blue);
+  color: var(--highlight-text);
+}
+
+/* Tab Controls */
+.win98-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: -2px;
+}
+
+.win98-tab {
+  padding: 4px 12px;
+  border: 2px solid;
+  border-color: var(--button-highlight) var(--button-shadow) transparent var(--button-highlight);
+  background: var(--button-face);
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+}
+
+.win98-tab.active {
+  border-bottom-color: var(--button-face);
+  z-index: 2;
+}
+
+.win98-tab:hover:not(.active) {
+  background: var(--button-light);
+}
+
+/* Links */
+.win98-link {
+  color: var(--link-blue);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.win98-link:visited {
+  color: #800080;
+}
+
+.win98-link:hover {
+  color: #0000cc;
+}
+
+/* Selection */
+::selection {
+  background: var(--highlight-color);
+  color: var(--highlight-text);
+}
+
+/* Scrollbar Styling (WebKit) */
+::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--field-background);
+  border: 1px solid var(--button-shadow);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--button-face);
+  border: 2px solid;
+  border-color: var(--button-highlight) var(--button-shadow) var(--button-shadow) var(--button-highlight);
+}
+
+::-webkit-scrollbar-button {
+  background: var(--button-face);
+  border: 2px solid;
+  border-color: var(--button-highlight) var(--button-shadow) var(--button-shadow) var(--button-highlight);
+  height: 16px;
+  width: 16px;
+}
+
+/* Loading Spinner (Retro Hourglass Style) */
+.win98-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--button-text);
+  border-radius: 0;
+  border-top-color: transparent;
+  animation: win98-spin 1s linear infinite;
+}
+
+@keyframes win98-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Utility Classes */
+.win98-text-xs { font-size: var(--font-size-xs); }
+.win98-text-sm { font-size: var(--font-size-sm); }
+.win98-text-md { font-size: var(--font-size-md); }
+.win98-text-lg { font-size: var(--font-size-lg); }
+.win98-text-xl { font-size: var(--font-size-xl); }
+.win98-text-2xl { font-size: var(--font-size-2xl); }
+
+.win98-text-bold { font-weight: bold; }
+.win98-text-center { text-align: center; }
+
+.win98-mb-xs { margin-bottom: var(--space-xs); }
+.win98-mb-sm { margin-bottom: var(--space-sm); }
+.win98-mb-md { margin-bottom: var(--space-md); }
+.win98-mb-lg { margin-bottom: var(--space-lg); }
+
+.win98-mt-xs { margin-top: var(--space-xs); }
+.win98-mt-sm { margin-top: var(--space-sm); }
+.win98-mt-md { margin-top: var(--space-md); }
+.win98-mt-lg { margin-top: var(--space-lg); }
+
+.win98-p-sm { padding: var(--space-sm); }
+.win98-p-md { padding: var(--space-md); }
+.win98-p-lg { padding: var(--space-lg); }
+
+/* Rotating Example Questions Animation */
+.rotating-placeholder {
+  animation: fade-in-out 8s ease-in-out infinite;
+}
+
+@keyframes fade-in-out {
+  0%, 100% { opacity: 0; }
+  10%, 40% { opacity: 1; }
+  50%, 90% { opacity: 0; }
+}

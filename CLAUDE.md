@@ -16,7 +16,8 @@ The codebase implements three distinct products sharing a common backend infrast
 - **Route:** `/api/consensus`
 - **Purpose:** Ask questions about SaaS tools, get vetted answers backed by multi-model consensus
 - **Key Feature:** Hidden complexity (multi-model comparison) → visible value (Trust Badge with consensus score)
-- **Models Used:** Claude Sonnet 4.5, GPT-4o, DeepSeek Chat (3 models for speed)
+- **Models Used:** Claude Sonnet 4.5, GPT-4o (2 models for speed - DeepSeek disabled due to API balance)
+- **UI:** Windows 98 retro design with Maurice Sendak ocean aesthetic
 - **Service Files:** `src/services/question-answering.ts`, `src/services/model-comparison.ts`
 
 ### Door B: Scuttle Alpha (Pro Feature - Opportunity Tracker)
@@ -40,13 +41,14 @@ The codebase implements three distinct products sharing a common backend infrast
 - **LLMs:** Multi-provider architecture
   - Anthropic Claude (primary)
   - OpenAI GPT-4o
-  - DeepSeek Chat
+  - DeepSeek Chat (currently disabled - insufficient API balance)
   - OpenRouter (Llama, Mistral)
   - Perplexity (web search)
   - Google Gemini (coming soon)
 - **Email:** Resend
 - **SMS:** Twilio
-- **Styling:** Tailwind CSS
+- **Styling:** Windows 98 retro design system (win98.css) + Tailwind CSS
+- **Design Inspiration:** Maurice Sendak's "Where the Wild Things Are" ocean aesthetic
 - **Type Safety:** TypeScript + Zod for validation
 
 ## Key Commands
@@ -188,7 +190,9 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 ## File Structure by Feature
 
 ### Door A (Consensus Tool)
-- `src/app/ask/page.tsx` - UI for asking questions
+- `src/app/ask/page.tsx` - UI for asking questions (Windows 98 design)
+- `src/app/ask/page-desktop.tsx` - Desktop version with draggable window
+- `src/app/desktop/page.tsx` - Desktop route (renders page-desktop)
 - `src/app/api/consensus/route.ts` - Multi-model consensus endpoint
 - `src/app/api/ask/route.ts` - Legacy single-model endpoint
 - `src/app/api/subscribe/route.ts` - Subscription management
@@ -211,11 +215,107 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 - `src/db/index.ts` - Drizzle client instance
 - `src/db/migrate.ts` - Migration runner
 
+### Windows 98 UI Components
+- `src/app/win98.css` - Complete Windows 98 design system (colors, components, ocean aesthetic)
+- `src/components/DraggableWindow.tsx` - Draggable window with flag, waves, minimize/maximize
+- `src/components/DesktopIcon.tsx` - Desktop icon component for shortcuts
+- `src/components/WUTTFlag.tsx` - WUTT flag component (standalone for mobile view)
+
 ### Legacy Features (Product Discovery)
 - `src/scrapers/` - Product Hunt & Twitter scrapers
 - `src/services/digest.ts` - Email digest generation
 - `src/services/llm-analysis.ts` - Product analysis with LLMs
 - `src/components/ProductCard.tsx` - Product display component
+
+## Windows 98 Design System
+
+The platform features a complete Windows 98 retro aesthetic inspired by Maurice Sendak's "Where the Wild Things Are" ocean illustrations.
+
+### Design Philosophy
+
+**Visual Identity:**
+- Muted burgundy sky (`#5a1015`) above simple 50/50 horizon
+- Teal-blue ocean (`#2b5266`) below horizon
+- SVG grain texture overlay for vintage paper/watercolor feel
+- Hand-drawn wave lines (not blocky patterns)
+- Triangular WUTT flag on draggable windows
+
+**Key Principle:** Simple, hand-drawn aesthetic - NO complex animations or blocky PNG patterns. User explicitly rejected multi-layer wave systems in favor of clean SVG lines.
+
+### Core Components (`src/app/win98.css`)
+
+**Windows 98 System:**
+- `.win98-window` - Window container with beveled borders
+- `.win98-title-bar` - Blue gradient title bar with window controls
+- `.win98-button` - 3D beveled buttons with hover/active states
+- `.win98-input` - Inset text inputs
+- `.win98-progress-bar` - Striped progress indicator
+- `.win98-groupbox` - Fieldset/legend containers
+- `.win98-menu-bar` - Menu bar with items
+- `.win98-status-field` - Inset status bar fields
+
+**Color System (CSS Variables):**
+```css
+--desktop-background: #5a1015;  /* Muted burgundy sky */
+--ocean-blue: #2b5266;          /* Teal-blue ocean */
+--ocean-texture: #1a3a4a;       /* Deep ocean depths */
+--button-face: #c0c0c0;         /* Classic Windows gray */
+--selection-blue: #000080;      /* Windows selection blue */
+```
+
+### DraggableWindow Component
+
+**Features:**
+- Full drag functionality (click title bar to drag)
+- Minimize, maximize, close buttons
+- Customizable menu bar with items
+- Optional WUTT flag (triangular, pointing left, with pole)
+- Hand-drawn wave SVG lines at bottom of window
+- Moves with window position
+
+**Props:**
+```typescript
+interface DraggableWindowProps {
+  title: string;
+  icon?: string;
+  children: ReactNode;
+  defaultPosition?: { x: number; y: number };
+  defaultSize?: { width: number; height: number };
+  onClose?: () => void;
+  menuItems?: Array<{ label: string; href?: string; onClick?: (e) => void }>;
+  showFlag?: boolean;  // Show WUTT flag
+}
+```
+
+**IMPORTANT FIX:** Menu items use `href="#"` with `preventDefault()` instead of `javascript:void(0)` to avoid React warnings.
+
+### Ocean/Wave Implementation
+
+**Simple Horizon:**
+- 50/50 gradient split (burgundy top, ocean blue bottom)
+- NO complex multi-layer wave animations
+- Subtle SVG grain texture (8% opacity) for vintage feel
+
+**Wave Lines:**
+- Hand-drawn SVG paths using quadratic curves
+- Positioned at bottom of draggable window
+- Move WITH the window (not fixed to screen)
+- Two layers with different opacity for depth
+
+**User Feedback:** "Waves should be just lines, not pictures of waves that are blocked around like that." - User explicitly rejected PNG patterns and complex animations.
+
+### Desktop Experience
+
+The `/desktop` route provides a full Windows 98 desktop with:
+- Draggable window positioned at center
+- Desktop icons (Ask, Compare, Alpha, etc.)
+- Taskbar with Start button and clock
+- Ocean background with simple horizon
+
+**DesktopIcon Component:**
+- Icon emoji + label
+- onClick handler for actions
+- Positioned absolutely on desktop
 
 ## Testing
 

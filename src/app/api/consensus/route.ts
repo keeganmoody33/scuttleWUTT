@@ -44,11 +44,11 @@ export async function POST(request: NextRequest) {
     const demandSignal = await getDemandSignal([question]);
 
     // Step 2: Run across our curated "Consensus Models"
-    // Optimized for speed: 3 high-quality, fast models with provider diversity
+    // Using 2 high-quality models (DeepSeek temporarily disabled due to API balance)
     const consensusModels: LLMModel[] = [
       'claude-sonnet-4-5', // Anthropic - highest quality
       'gpt-4o', // OpenAI - fast and reliable
-      'deepseek-chat', // DeepSeek - alternative perspective
+      // 'deepseek-chat', // DeepSeek - disabled (insufficient balance)
     ];
 
     console.log(`[Consensus API] Running across ${consensusModels.length} models...`);
