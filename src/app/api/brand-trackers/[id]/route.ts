@@ -47,7 +47,7 @@ export async function GET(
 
         return NextResponse.json({ tracker });
     } catch (error) {
-        logger.error('Error fetching brand tracker', error);
+        logger.error('Error fetching brand tracker', error as Error);
 
         return NextResponse.json(
             {
@@ -124,7 +124,7 @@ export async function PUT(
             message: 'Brand tracker refreshed successfully',
         });
     } catch (error) {
-        logger.error('Error updating brand tracker', error);
+        logger.error('Error updating brand tracker', error as Error);
 
         return NextResponse.json(
             {
@@ -185,7 +185,7 @@ export async function DELETE(
             message: 'Brand tracker deleted successfully',
         });
     } catch (error) {
-        logger.error('Error deleting brand tracker', error);
+        logger.error('Error deleting brand tracker', error as Error);
 
         return NextResponse.json(
             {

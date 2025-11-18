@@ -218,7 +218,7 @@ export async function POST(request: NextRequest) {
       methodologyUrl: `/question/${questionId}/compare`,
     });
   } catch (error) {
-    logger.error('Consensus API error', error);
+    logger.error('Consensus API error', error as Error);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(

@@ -172,7 +172,7 @@ export async function scoreProducts() {
         qualityScore: scores.qualityScore,
       });
     } catch (err) {
-      logger.error('Failed to score product', err, { productId: product.id, productName: product.name });
+      logger.error('Failed to score product', err as Error, { productId: product.id, productName: product.name });
     }
   }
 

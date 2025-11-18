@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    logger.error('Compare API error', error);
+    logger.error('Compare API error', error as Error);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(

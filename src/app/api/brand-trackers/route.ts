@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
             trackers: allTrackers,
         });
     } catch (error) {
-        logger.error('Error fetching brand trackers', error);
+        logger.error('Error fetching brand trackers', error as Error);
 
         return NextResponse.json(
             {
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
             message: 'Brand tracker created successfully',
         });
     } catch (error) {
-        logger.error('Error creating brand tracker', error);
+        logger.error('Error creating brand tracker', error as Error);
 
         if (error instanceof z.ZodError) {
             return NextResponse.json(

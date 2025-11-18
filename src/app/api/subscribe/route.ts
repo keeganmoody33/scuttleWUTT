@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
       nextUpdateDate: nextSendAt,
     });
   } catch (error) {
-    logger.error('Error creating subscription', error);
+    logger.error('Error creating subscription', error as Error);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -208,7 +208,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ message: 'Unsubscribed successfully' });
   } catch (error) {
-    logger.error('Error unsubscribing', error);
+    logger.error('Error unsubscribing', error as Error);
 
     return NextResponse.json(
       {

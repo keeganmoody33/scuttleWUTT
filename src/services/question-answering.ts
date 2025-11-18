@@ -95,7 +95,7 @@ export async function answerQuestion(
       generatedAt: new Date().toISOString(),
     };
   } catch (error) {
-    logger.error('Error answering question', error, { model });
+    logger.error('Error answering question', error as Error, { model });
     throw new Error('Failed to generate answer');
   }
 }

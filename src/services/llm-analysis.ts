@@ -106,7 +106,7 @@ export async function analyzeProducts(limit: number = 50) {
 
       logger.info('Completed product analysis', { productId: product.id });
     } catch (err) {
-      logger.error('Failed to analyze product', err, { productId: product.id });
+      logger.error('Failed to analyze product', err as Error, { productId: product.id });
     }
   }
 

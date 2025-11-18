@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
       trackers: allTrackers,
     });
   } catch (error) {
-    logger.error('Error fetching trackers', error);
+    logger.error('Error fetching trackers', error as Error);
 
     return NextResponse.json(
       {
@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
       message: `Tracker created! Window status: ${opportunityWindow.status}`,
     });
   } catch (error) {
-    logger.error('Error creating tracker', error);
+    logger.error('Error creating tracker', error as Error);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(

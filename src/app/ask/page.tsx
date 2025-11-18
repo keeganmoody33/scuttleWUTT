@@ -395,11 +395,11 @@ export default function AskPage() {
                         padding: '4px',
                         textAlign: 'center',
                         fontSize: '10px',
-                        background: loadingProgress > (idx + 1) * 45 ? '#008000' : '#c0c0c0',
-                        color: loadingProgress > (idx + 1) * 45 ? '#ffffff' : '#000000',
+                        background: loadingProgress > (idx + 1) * 40 ? '#008000' : '#c0c0c0',
+                        color: loadingProgress > (idx + 1) * 40 ? '#ffffff' : '#000000',
                       }}
                     >
-                      {loadingProgress > (idx + 1) * 45 ? '√ ' : '⏳ '}
+                      {loadingProgress > (idx + 1) * 40 ? '√ ' : '⏳ '}
                       {model}
                     </div>
                   ))}

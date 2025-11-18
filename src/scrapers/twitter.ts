@@ -184,7 +184,7 @@ export async function scrapeTwitter() {
 
     logger.info('Twitter scrape completed', { productsFound });
   } catch (err) {
-    logger.error('Twitter scrape failed', err);
+    logger.error('Twitter scrape failed', err as Error);
 
     await db
       .update(scrapingJobs)

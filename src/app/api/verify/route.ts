@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
       verified: true,
     });
   } catch (error) {
-    logger.error('Error verifying subscription', error);
+    logger.error('Error verifying subscription', error as Error);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -205,7 +205,7 @@ export async function PUT(request: NextRequest) {
       message: 'Verification code resent successfully',
     });
   } catch (error) {
-    logger.error('Error resending verification code', error);
+    logger.error('Error resending verification code', error as Error);
 
     return NextResponse.json(
       {

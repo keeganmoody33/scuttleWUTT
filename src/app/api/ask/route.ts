@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       answer,
     });
   } catch (error) {
-    logger.error('Error processing ask request', error);
+    logger.error('Error processing ask request', error as Error);
     return NextResponse.json(
       {
         error: 'Failed to process question',

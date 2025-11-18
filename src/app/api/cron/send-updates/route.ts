@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
           const previousSnapshot = await getLatestSnapshot(subscription.questionId);
 
           if (previousSnapshot && previousSnapshot.id !== newSnapshotId) {
-            const diff = compareSnapshots(previousSnapshot, newAnswer);
+            const diff = compareSnapshots(previousSnapshot, { answer: newAnswer });
             const hasChanges = hasSignificantChanges(diff);
 
             if (!hasChanges) {
@@ -176,7 +176,7 @@ export async function GET(request: NextRequest) {
         });
       } catch (err) {
         errorCount++;
-        logger.error('Failed to process subscription', err, {
+        logger.error('Failed to process subscription', err as Error, {
           subscriptionId: subscription.id,
         });
       }
@@ -197,7 +197,7 @@ export async function GET(request: NextRequest) {
       errors: errorCount,
     });
   } catch (error) {
-    logger.error('Send-updates cron job failed', error);
+    logger.error('Send-updates cron job failed', error as Error);
     return NextResponse.json(
       { error: 'Failed to send updates', details: String(error) },
       { status: 500 }

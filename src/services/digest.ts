@@ -304,7 +304,7 @@ export async function generateDigestsForAllUsers(): Promise<void> {
         await sendDigestToUser(user.id);
       }
     } catch (err) {
-      logger.error('Failed to send digest to user', err, { userId: user.id });
+      logger.error('Failed to send digest to user', err as Error, { userId: user.id });
     }
   }
 

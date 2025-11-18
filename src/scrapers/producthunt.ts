@@ -3,6 +3,7 @@ import { db, products, productSources, scrapingJobs } from '@/db';
 import { generateId } from '@/lib/utils';
 import { eq } from 'drizzle-orm';
 import { env } from '@/lib/env';
+import { logger } from '@/services/logger';
 
 interface ProductHuntPost {
   id: string;
@@ -184,7 +185,7 @@ export async function scrapeProductHunt() {
 
     logger.info('Product Hunt scrape completed', { productsFound });
   } catch (err) {
-    logger.error('Product Hunt scrape failed', err);
+    logger.error('Product Hunt scrape failed', err as Error);
 
     await db
       .update(scrapingJobs)

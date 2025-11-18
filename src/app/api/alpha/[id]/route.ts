@@ -146,7 +146,7 @@ export async function PUT(
       message: 'Tracker refreshed successfully',
     });
   } catch (error) {
-    logger.error('Error updating tracker', error);
+    logger.error('Error updating tracker', error as Error);
 
     return NextResponse.json(
       {
@@ -207,7 +207,7 @@ export async function DELETE(
       message: 'Tracker deleted successfully',
     });
   } catch (error) {
-    logger.error('Error deleting tracker', error);
+    logger.error('Error deleting tracker', error as Error);
 
     return NextResponse.json(
       {
