@@ -150,6 +150,13 @@ Dependabot is configured to automatically check for dependency updates weekly. Y
 
 Review and merge these PRs to keep dependencies secure and up to date.
 
+## 📚 Documentation
+
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System architecture, data flow, components, deployment checklist, security & infrastructure
+- **[RATE_LIMITING.md](./RATE_LIMITING.md)** - Rate limiting implementation, API quotas, client integration, scaling considerations
+- **[QA_SYSTEM.md](./QA_SYSTEM.md)** - Q&A system documentation for Door A (Consensus Tool)
+- **[SMS_FEATURE.md](./SMS_FEATURE.md)** - SMS notification feature specification
+
 ## 📊 Roadmap
 
 - [ ] Core platform setup

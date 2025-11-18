@@ -3,6 +3,11 @@ import { db, questionSubscriptions } from '@/db';
 import { generateId } from '@/lib/utils';
 import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
+import { env } from '@/lib/env';
+import { logger } from '@/services/logger';
+import { sendVerificationCodeSMS, formatPhoneNumber, validatePhoneNumber } from '@/services/sms';
+import { authorizeRequest } from '@/lib/auth';
+import { enforceRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -33,19 +38,33 @@ const SubscribeSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    const { authorized, reason } = authorizeRequest(request);
+    if (!authorized) {
+      return NextResponse.json({ error: reason || 'Unauthorized' }, { status: 401 });
+    }
+
+    const rateLimit = enforceRateLimit(request, 'api:subscribe');
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many subscription attempts. Please wait.' },
+        { status: 429, headers: { 'Retry-After': Math.ceil(rateLimit.resetInMs / 1000).toString() } }
+      );
+    }
+
     const body = await request.json();
 
-    // Validate input
     const validatedData = SubscribeSchema.parse(body);
 
     const { email, phone, deliveryMethod, questionId, question, frequencyDays, notifyOnChangeOnly } = validatedData;
 
-    console.log(`Processing subscription: ${email || phone} via ${deliveryMethod} for question "${question}" (every ${frequencyDays} days)`);
+    logger.info('Processing subscription request', {
+      deliveryMethod,
+      questionId,
+      frequencyDays,
+    });
 
-    // Format phone number if provided
     let formattedPhone = phone;
     if (phone) {
-      const { formatPhoneNumber, validatePhoneNumber } = await import('@/services/sms');
       if (!validatePhoneNumber(phone)) {
         return NextResponse.json(
           { error: 'Invalid phone number format' },
@@ -55,7 +74,6 @@ export async function POST(request: NextRequest) {
       formattedPhone = formatPhoneNumber(phone);
     }
 
-    // Check if this contact is already subscribed to this question
     const existing = await db.query.questionSubscriptions.findFirst({
       where: (subs, { and, eq, or }) =>
         and(
@@ -69,7 +87,6 @@ export async function POST(request: NextRequest) {
     });
 
     if (existing) {
-      // Update existing subscription
       await db
         .update(questionSubscriptions)
         .set({
@@ -82,7 +99,7 @@ export async function POST(request: NextRequest) {
         })
         .where(eq(questionSubscriptions.id, existing.id));
 
-      console.log(`✓ Updated existing subscription: ${existing.id}`);
+      logger.info('Updated existing subscription', { subscriptionId: existing.id });
 
       return NextResponse.json({
         message: 'Subscription updated successfully',
@@ -90,11 +107,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Create new subscription (unverified)
     const subscriptionId = generateId('sub');
     const nextSendAt = new Date(Date.now() + frequencyDays * 24 * 60 * 60 * 1000);
 
-    // Generate verification code
     const { generateVerificationCode, getCodeExpirationTime } = await import('@/services/verification');
     const verificationCode = generateVerificationCode();
     const verificationCodeExpiresAt = getCodeExpirationTime();
@@ -109,7 +124,7 @@ export async function POST(request: NextRequest) {
       frequencyDays,
       notifyOnChangeOnly,
       nextSendAt,
-      verified: false, // Not verified yet
+      verified: false,
       verificationCode,
       verificationCodeExpiresAt,
       verificationSentAt: new Date(),
@@ -117,51 +132,33 @@ export async function POST(request: NextRequest) {
       createdAt: new Date(),
     });
 
-    // Send verification code
-    if (deliveryMethod === 'email' || deliveryMethod === 'both') {
-      if (email) {
-        // Send email verification
-        const { Resend } = await import('resend');
-        const resend = new Resend(process.env.RESEND_API_KEY);
-
-        await resend.emails.send({
-          from: 'Scuttle What <verify@scuttlewhat.com>',
-          to: email,
-          subject: 'Verify your Scuttle What subscription',
-          html: `
-            <h2>Verify your subscription</h2>
-            <p>Your verification code is:</p>
-            <h1 style="font-size: 32px; letter-spacing: 8px; font-family: monospace;">${verificationCode}</h1>
-            <p>This code expires in 10 minutes.</p>
-            <p>Enter this code to activate your subscription to: "${question}"</p>
-          `,
-        });
-
-        console.log(`✓ Sent email verification code to ${email}`);
+    if ((deliveryMethod === 'email' || deliveryMethod === 'both') && email) {
+      if (!env.RESEND_API_KEY) {
+        throw new Error('RESEND_API_KEY is not configured');
       }
+
+      const { Resend } = await import('resend');
+      const resend = new Resend(env.RESEND_API_KEY);
+
+      await resend.emails.send({
+        from: 'Scuttle What <verify@scuttlewhat.com>',
+        to: email,
+        subject: 'Verify your Scuttle What subscription',
+        html: `
+          <h2>Verify your subscription</h2>
+          <p>Your verification code is:</p>
+          <h1 style="font-size: 32px; letter-spacing: 8px; font-family: monospace;">${verificationCode}</h1>
+          <p>This code expires in 10 minutes.</p>
+          <p>Enter this code to activate your subscription to: "${question}"</p>
+        `,
+      });
     }
 
-    if (deliveryMethod === 'sms' || deliveryMethod === 'both') {
-      if (formattedPhone) {
-        // Send SMS verification
-        const { sendSMSUpdate } = await import('@/services/sms');
-        const twilio = (await import('twilio')).default;
-        const twilioClient = twilio(
-          process.env.TWILIO_ACCOUNT_SID,
-          process.env.TWILIO_AUTH_TOKEN
-        );
-
-        await twilioClient.messages.create({
-          body: `Scuttle What verification code: ${verificationCode}\n\nEnter this code to activate your subscription. Expires in 10 minutes.`,
-          from: process.env.TWILIO_PHONE_NUMBER,
-          to: formattedPhone,
-        });
-
-        console.log(`✓ Sent SMS verification code to ${formattedPhone}`);
-      }
+    if ((deliveryMethod === 'sms' || deliveryMethod === 'both') && formattedPhone) {
+      await sendVerificationCodeSMS(formattedPhone, verificationCode);
     }
 
-    console.log(`✓ Created subscription: ${subscriptionId} (unverified)`);
+    logger.info('Created new subscription (verification pending)', { subscriptionId });
 
     return NextResponse.json({
       message: 'Verification code sent. Please check your email/phone.',
@@ -170,7 +167,7 @@ export async function POST(request: NextRequest) {
       nextUpdateDate: nextSendAt,
     });
   } catch (error) {
-    console.error('Error creating subscription:', error);
+    logger.error('Error creating subscription', error);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -185,7 +182,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: 'Failed to create subscription',
-        details: error instanceof Error ? error.message : 'Unknown error',
+        details: 'Please try again later.',
       },
       { status: 500 }
     );
@@ -207,16 +204,16 @@ export async function DELETE(request: NextRequest) {
       .set({ active: false })
       .where(eq(questionSubscriptions.id, subscriptionId));
 
-    console.log(`✓ Unsubscribed: ${subscriptionId}`);
+    logger.info('Subscription deactivated', { subscriptionId });
 
     return NextResponse.json({ message: 'Unsubscribed successfully' });
   } catch (error) {
-    console.error('Error unsubscribing:', error);
+    logger.error('Error unsubscribing', error);
 
     return NextResponse.json(
       {
         error: 'Failed to unsubscribe',
-        details: error instanceof Error ? error.message : 'Unknown error',
+        details: 'Please try again later.',
       },
       { status: 500 }
     );

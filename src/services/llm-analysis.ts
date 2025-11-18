@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { db, products } from '@/db';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
+import { logger } from '@/services/logger';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -76,23 +77,21 @@ Return JSON matching this schema:
 }
 
 export async function analyzeProducts(limit: number = 50) {
-  console.log('Analyzing unprocessed products...');
+  logger.info('Analyzing unprocessed products');
 
-  // Get unprocessed products
   const unprocessedProducts = await db.query.products.findMany({
     where: (products, { eq }) => eq(products.processed, false),
     limit,
   });
 
-  console.log(`Found ${unprocessedProducts.length} unprocessed products`);
+  logger.info('Found unprocessed products', { count: unprocessedProducts.length });
 
   for (const product of unprocessedProducts) {
     try {
-      console.log(`Analyzing: ${product.name}...`);
+      logger.debug('Analyzing product', { productId: product.id, name: product.name });
 
       const analysis = await analyzeProduct(product);
 
-      // Update product with analysis
       await db
         .update(products)
         .set({
@@ -105,12 +104,11 @@ export async function analyzeProducts(limit: number = 50) {
         })
         .where(eq(products.id, product.id));
 
-      console.log(`✓ Analyzed: ${product.name}`);
+      logger.info('Completed product analysis', { productId: product.id });
     } catch (err) {
-      console.error(`Failed to analyze ${product.name}:`, err);
-      // Don't throw, continue with other products
+      logger.error('Failed to analyze product', err, { productId: product.id });
     }
   }
 
-  console.log(`✓ Analysis complete: ${unprocessedProducts.length} products processed`);
+  logger.info('Product analysis finished', { processedCount: unprocessedProducts.length });
 }

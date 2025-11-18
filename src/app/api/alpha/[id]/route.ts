@@ -4,6 +4,9 @@ import { eq } from 'drizzle-orm';
 import { getDemandSignal, calculateOpportunityScore } from '@/services/demand-proxy';
 import { answerQuestion } from '@/services/question-answering';
 import { compareModelResponses } from '@/services/model-comparison';
+import { authorizeRequest } from '@/lib/auth';
+import { enforceRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/services/logger';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,6 +21,19 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { authorized, reason } = authorizeRequest(request);
+    if (!authorized) {
+      return NextResponse.json({ error: reason || 'Unauthorized' }, { status: 401 });
+    }
+
+    const rateLimit = enforceRateLimit(request, 'api:alpha:update');
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many refresh attempts. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': Math.ceil(rateLimit.resetInMs / 1000).toString() } }
+      );
+    }
+
     const { id } = params;
 
     // Get the existing tracker
@@ -36,7 +52,7 @@ export async function PUT(
 
     const tracker = existing[0];
 
-    console.log(`[Alpha API] Refreshing tracker ${id}: "${tracker.ideaName}"`);
+    logger.info('Refreshing opportunity tracker', { trackerId: id, ideaName: tracker.ideaName });
 
     // Re-run the analysis
     // Step 1: Get updated demand signal
@@ -63,7 +79,7 @@ export async function PUT(
             success: true,
           };
         } catch (error) {
-          console.error(`[Alpha API] Error with ${model}:`, error);
+          logger.warn('Model call failed during tracker refresh', { model, trackerId: id, error });
           return {
             model,
             answer: null,
@@ -116,7 +132,7 @@ export async function PUT(
       })
       .where(eq(opportunityTrackers.id, id));
 
-    console.log(`[Alpha API] Updated tracker ${id}: ${opportunityWindow.status} (${opportunityWindow.score}/100)`);
+    logger.info('Tracker updated successfully', { trackerId: id, status: opportunityWindow.status, score: opportunityWindow.score });
 
     // Return updated tracker
     const updated = await db
@@ -130,12 +146,12 @@ export async function PUT(
       message: 'Tracker refreshed successfully',
     });
   } catch (error) {
-    console.error('[Alpha API] Error updating tracker:', error);
+    logger.error('Error updating tracker', error);
 
     return NextResponse.json(
       {
         error: 'Failed to update tracker',
-        details: error instanceof Error ? error.message : 'Unknown error',
+        details: 'Please try again later.',
       },
       { status: 500 }
     );
@@ -151,6 +167,19 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { authorized, reason } = authorizeRequest(request);
+    if (!authorized) {
+      return NextResponse.json({ error: reason || 'Unauthorized' }, { status: 401 });
+    }
+
+    const rateLimit = enforceRateLimit(request, 'api:alpha:delete');
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many delete attempts.' },
+        { status: 429, headers: { 'Retry-After': Math.ceil(rateLimit.resetInMs / 1000).toString() } }
+      );
+    }
+
     const { id } = params;
 
     // Check if tracker exists
@@ -172,18 +201,18 @@ export async function DELETE(
       .delete(opportunityTrackers)
       .where(eq(opportunityTrackers.id, id));
 
-    console.log(`[Alpha API] Deleted tracker ${id}`);
+    logger.info('Tracker deleted successfully', { trackerId: id });
 
     return NextResponse.json({
       message: 'Tracker deleted successfully',
     });
   } catch (error) {
-    console.error('[Alpha API] Error deleting tracker:', error);
+    logger.error('Error deleting tracker', error);
 
     return NextResponse.json(
       {
         error: 'Failed to delete tracker',
-        details: error instanceof Error ? error.message : 'Unknown error',
+        details: 'Please try again later.',
       },
       { status: 500 }
     );

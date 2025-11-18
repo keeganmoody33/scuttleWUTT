@@ -2,6 +2,7 @@ import axios from 'axios';
 import { db, products, productSources, scrapingJobs } from '@/db';
 import { generateId } from '@/lib/utils';
 import { eq } from 'drizzle-orm';
+import { env } from '@/lib/env';
 
 interface ProductHuntPost {
   id: string;
@@ -82,10 +83,9 @@ export async function scrapeProductHunt() {
   let productsFound = 0;
   const errors: string[] = [];
 
-  console.log('Starting Product Hunt scrape...');
+  logger.info('Starting Product Hunt scrape');
 
   try {
-    // Create scraping job
     await db.insert(scrapingJobs).values({
       id: jobId,
       sourceType: 'producthunt',
@@ -94,12 +94,10 @@ export async function scrapeProductHunt() {
       createdAt: new Date(),
     });
 
-    const apiKey = process.env.PRODUCTHUNT_API_KEY;
-    if (!apiKey) {
+    if (!env.PRODUCTHUNT_API_KEY) {
       throw new Error('PRODUCTHUNT_API_KEY not configured');
     }
 
-    // Fetch today's featured products
     const response = await axios.post<ProductHuntResponse>(
       PRODUCTHUNT_API_URL,
       {
@@ -111,7 +109,7 @@ export async function scrapeProductHunt() {
       },
       {
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${env.PRODUCTHUNT_API_KEY}`,
           'Content-Type': 'application/json',
         },
       }
@@ -121,7 +119,6 @@ export async function scrapeProductHunt() {
 
     for (const { node: post } of posts) {
       try {
-        // Check if we already have this product source
         const existingSource = await db.query.productSources.findFirst({
           where: (sources, { and, eq }) =>
             and(
@@ -131,14 +128,11 @@ export async function scrapeProductHunt() {
         });
 
         if (existingSource) {
-          console.log(`Product already exists: ${post.name}`);
           continue;
         }
 
-        // Extract categories from topics
         const categories = post.topics.edges.map((edge) => edge.node.name);
 
-        // Create product
         const productId = generateId('prod');
         await db.insert(products).values({
           id: productId,
@@ -153,13 +147,12 @@ export async function scrapeProductHunt() {
           upvotes: post.votesCount,
           comments: post.commentsCount,
           categories,
-          tags: categories, // Will be enriched later
-          processed: false, // LLM analysis pending
+          tags: categories,
+          processed: false,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
 
-        // Create product source
         await db.insert(productSources).values({
           id: generateId('src'),
           productId,
@@ -171,15 +164,14 @@ export async function scrapeProductHunt() {
         });
 
         productsFound++;
-        console.log(`✓ Scraped: ${post.name} (${post.votesCount} upvotes)`);
+        logger.info('Scraped Product Hunt launch', { productId, name: post.name });
       } catch (err) {
         const error = `Error processing product ${post.name}: ${err}`;
-        console.error(error);
+        logger.warn('Product Hunt product processing failed', { error });
         errors.push(error);
       }
     }
 
-    // Update job as completed
     await db
       .update(scrapingJobs)
       .set({
@@ -190,9 +182,9 @@ export async function scrapeProductHunt() {
       })
       .where(eq(scrapingJobs.id, jobId));
 
-    console.log(`✓ Product Hunt scrape completed: ${productsFound} products found`);
+    logger.info('Product Hunt scrape completed', { productsFound });
   } catch (err) {
-    console.error('Product Hunt scrape failed:', err);
+    logger.error('Product Hunt scrape failed', err);
 
     await db
       .update(scrapingJobs)

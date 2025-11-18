@@ -7,6 +7,9 @@ import { callMultipleModels } from '@/services/llm';
 import { compareModelResponses } from '@/services/model-comparison';
 import { answerQuestion } from '@/services/question-answering';
 import { eq } from 'drizzle-orm';
+import { authorizeRequest } from '@/lib/auth';
+import { enforceRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/services/logger';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,6 +27,19 @@ const CreateTrackerSchema = z.object({
  */
 export async function GET(request: NextRequest) {
   try {
+    const { authorized, reason } = authorizeRequest(request);
+    if (!authorized) {
+      return NextResponse.json({ error: reason || 'Unauthorized' }, { status: 401 });
+    }
+
+    const rateLimit = enforceRateLimit(request, 'api:alpha:get');
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many tracker reads. Please slow down.' },
+        { status: 429, headers: { 'Retry-After': Math.ceil(rateLimit.resetInMs / 1000).toString() } }
+      );
+    }
+
     // TODO: Add authentication and filter by user
     // For MVP, return all trackers
     const allTrackers = await db
@@ -35,12 +51,12 @@ export async function GET(request: NextRequest) {
       trackers: allTrackers,
     });
   } catch (error) {
-    console.error('[Alpha API] Error fetching trackers:', error);
+    logger.error('Error fetching trackers', error);
 
     return NextResponse.json(
       {
         error: 'Failed to fetch trackers',
-        details: error instanceof Error ? error.message : 'Unknown error',
+        details: 'Please try again later.',
       },
       { status: 500 }
     );
@@ -53,12 +69,25 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const { authorized, reason } = authorizeRequest(request);
+    if (!authorized) {
+      return NextResponse.json({ error: reason || 'Unauthorized' }, { status: 401 });
+    }
+
+    const rateLimit = enforceRateLimit(request, 'api:alpha:post');
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many tracker creations. Please wait.' },
+        { status: 429, headers: { 'Retry-After': Math.ceil(rateLimit.resetInMs / 1000).toString() } }
+      );
+    }
+
     const body = await request.json();
     const validatedData = CreateTrackerSchema.parse(body);
 
     const { ideaName, keywords } = validatedData;
 
-    console.log(`[Alpha API] Creating tracker for "${ideaName}" with keywords:`, keywords);
+    logger.info('Creating opportunity tracker', { ideaName, keywordCount: keywords.length });
 
     // Step 1: Get Market Intent signal
     const demandSignal = await getDemandSignal(keywords);
@@ -86,7 +115,7 @@ export async function POST(request: NextRequest) {
             success: true,
           };
         } catch (error) {
-          console.error(`[Alpha API] Error with ${model}:`, error);
+          logger.warn('Model call failed during tracker creation', { model, error });
           return {
             model,
             answer: null,
@@ -143,7 +172,7 @@ export async function POST(request: NextRequest) {
       updatedAt: now,
     });
 
-    console.log(`[Alpha API] Created tracker ${trackerId}: ${opportunityWindow.status} (${opportunityWindow.score}/100)`);
+    logger.info('Tracker created successfully', { trackerId, status: opportunityWindow.status, score: opportunityWindow.score });
 
     // Return the created tracker
     const tracker = await db
@@ -157,7 +186,7 @@ export async function POST(request: NextRequest) {
       message: `Tracker created! Window status: ${opportunityWindow.status}`,
     });
   } catch (error) {
-    console.error('[Alpha API] Error creating tracker:', error);
+    logger.error('Error creating tracker', error);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(

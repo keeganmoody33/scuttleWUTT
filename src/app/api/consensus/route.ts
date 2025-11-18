@@ -7,6 +7,9 @@ import { callMultipleModels, type LLMModel, getModelMetadata } from '@/services/
 import { compareModelResponses, getConsensusRecommendations } from '@/services/model-comparison';
 import { createSnapshot } from '@/services/snapshots';
 import { getDemandSignal } from '@/services/demand-proxy';
+import { logger } from '@/services/logger';
+import { authorizeRequest } from '@/lib/auth';
+import { enforceRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,13 +35,26 @@ const ConsensusSchema = z.object({
  */
 export async function POST(request: NextRequest) {
   try {
+    const { authorized, reason } = authorizeRequest(request);
+    if (!authorized) {
+      return NextResponse.json({ error: reason || 'Unauthorized' }, { status: 401 });
+    }
+
+    const rateLimit = enforceRateLimit(request, 'api:consensus');
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many consensus requests. Please try later.' },
+        { status: 429, headers: { 'Retry-After': Math.ceil(rateLimit.resetInMs / 1000).toString() } }
+      );
+    }
+
     const body = await request.json();
 
     // Validate input
     const validatedData = ConsensusSchema.parse(body);
     const { question } = validatedData;
 
-    console.log(`[Consensus API] Processing question: "${question}"`);
+    logger.info('Consensus API request received', { preview: question.slice(0, 80) });
 
     // Step 1: Get market intent signal (for context, not shown to basic user)
     const demandSignal = await getDemandSignal([question]);
@@ -51,7 +67,7 @@ export async function POST(request: NextRequest) {
       // 'deepseek-chat', // DeepSeek - disabled (insufficient balance)
     ];
 
-    console.log(`[Consensus API] Running across ${consensusModels.length} models...`);
+    logger.info('Running consensus comparison', { modelCount: consensusModels.length });
 
     // Call all models in parallel
     const responses = await Promise.all(
@@ -69,8 +85,7 @@ export async function POST(request: NextRequest) {
             success: true,
           };
         } catch (error) {
-          console.error(`[Consensus API] Error with ${model}:`, error);
-
+          logger.warn('Consensus model call failed', { model, error });
           return {
             model,
             answer: null,
@@ -95,7 +110,7 @@ export async function POST(request: NextRequest) {
 
     if (successfulResponses.length < 2) {
       // Fallback to single model if multi-model fails
-      console.warn('[Consensus API] Multi-model failed, falling back to single model');
+      logger.warn('Consensus fallback triggered', { successfulResponses: successfulResponses.length });
 
       const fallbackAnswer = await answerQuestion(question, 'claude-sonnet-4-5');
 
@@ -116,9 +131,15 @@ export async function POST(request: NextRequest) {
         answer: fallbackAnswer,
         trustBadge: {
           modelsUsed: 1,
+          modelsQueried: consensusModels.length, // We attempted to query all models, only 1 succeeded
           consensusScore: 100, // Single model = 100% consensus with itself
           diversityScore: 0,
           message: 'Powered by Claude Sonnet 4.5',
+          breakdown: {
+            unanimous: fallbackAnswer.tools?.length || 0, // Single model = all tools are unanimous
+            majority: 0,
+            unique: 0,
+          },
         },
       });
     }
@@ -154,6 +175,11 @@ export async function POST(request: NextRequest) {
 
     // Create snapshot with special model tag for consensus
     await createSnapshot(questionId, question, consensusAnswer, 'consensus-v1');
+
+    logger.info('Consensus answer generated', {
+      questionId,
+      modelsUsed: successfulResponses.length,
+    });
 
     // Step 6: Return the simplified answer with Trust Badge
     return NextResponse.json({
@@ -192,7 +218,7 @@ export async function POST(request: NextRequest) {
       methodologyUrl: `/question/${questionId}/compare`,
     });
   } catch (error) {
-    console.error('[Consensus API] Error:', error);
+    logger.error('Consensus API error', error);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -207,7 +233,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: 'Failed to generate consensus',
-        details: error instanceof Error ? error.message : 'Unknown error',
+        details: 'Please try again later.',
       },
       { status: 500 }
     );

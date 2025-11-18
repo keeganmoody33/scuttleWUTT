@@ -3,24 +3,6 @@
 import { useState, useEffect } from 'react';
 import { Search, Loader2, Mail, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
-import WUTTFlag from '@/components/WUTTFlag';
-
-// Add metadata via client-side head update
-if (typeof document !== 'undefined') {
-  document.title = 'ScuttleWUTT - What\'s the scuttlebutt?';
-
-  // Update meta description
-  let metaDesc = document.querySelector('meta[name="description"]');
-  if (!metaDesc) {
-    metaDesc = document.createElement('meta');
-    metaDesc.setAttribute('name', 'description');
-    document.head.appendChild(metaDesc);
-  }
-  metaDesc.setAttribute(
-    'content',
-    'Which SaaS tool should you actually use? We cross-reference Claude Sonnet 4.5 and GPT-4o to show you consensus recommendations. No BS, just AI-verified answers.'
-  );
-}
 
 interface Tool {
   name: string;
@@ -72,15 +54,6 @@ export default function AskPage() {
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState('Loading...');
-  const [currentExampleIndex, setCurrentExampleIndex] = useState(0);
-
-  // Example questions that rotate
-  const exampleQuestions = [
-    'Top 5 NFL teams',
-    'best-in-box co-pilot for sales teams',
-    'AI tools for content creation',
-    'CRM for small businesses',
-  ];
 
   // Subscription state
   const [showSubscribe, setShowSubscribe] = useState(false);
@@ -109,17 +82,26 @@ export default function AskPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Rotate example questions every 4 seconds
+  // Set document title and meta description on mount
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentExampleIndex((prev) => (prev + 1) % exampleQuestions.length);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [exampleQuestions.length]);
+    document.title = 'ScuttleWUTT - What\'s the scuttlebutt?';
 
-  // Core submission logic extracted for reuse
-  const submitQuestion = async () => {
-    // Validation
+    // Update meta description
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if (!metaDesc) {
+      metaDesc = document.createElement('meta');
+      metaDesc.setAttribute('name', 'description');
+      document.head.appendChild(metaDesc);
+    }
+    metaDesc.setAttribute(
+      'content',
+      'Which SaaS tool should you actually use? We cross-reference Claude, GPT-4, and DeepSeek to show you consensus recommendations. No BS, just AI-verified answers.'
+    );
+  }, []);
+
+  const handleAsk = async (e: React.FormEvent) => {
+    e.preventDefault();
+
     if (!question.trim()) return;
 
     setLoading(true);
@@ -162,11 +144,6 @@ export default function AskPage() {
         setLoadingProgress(0);
       }, 300);
     }
-  };
-
-  const handleAsk = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await submitQuestion();
   };
 
   const handleSubscribe = async (e: React.FormEvent) => {
@@ -277,13 +254,7 @@ export default function AskPage() {
   };
 
   return (
-    <div className={`win98-desktop ${loading ? 'searching' : ''}`} style={{ minHeight: '100vh' }}>
-      {/* Hand-Drawn Wave Line */}
-      <div className="wave-line"></div>
-
-      {/* WUTT Flag */}
-      <WUTTFlag />
-
+    <div className="win98-desktop" style={{ minHeight: '100vh' }}>
       {/* Main Window */}
       <div className="win98-window" style={{ maxWidth: '900px', margin: '0 auto' }}>
         {/* Title Bar */}
@@ -319,10 +290,10 @@ export default function AskPage() {
                 Which SaaS tool should you actually use?
               </p>
               <p style={{ marginBottom: '4px' }}>
-                We ask 2 leading AI models, then show you only what they agree on.
+                We ask 3 leading AI models, then show you only what they agree on.
               </p>
               <p style={{ fontSize: '10px', color: '#666' }}>
-                Cross-verified by Claude Sonnet 4.5 and GPT-4o
+                Cross-verified by Claude Sonnet 4.5, GPT-4o, and DeepSeek
               </p>
             </div>
           </div>
@@ -330,43 +301,27 @@ export default function AskPage() {
           {/* Search Form */}
           <div className="win98-groupbox" style={{ marginBottom: '16px' }}>
             <legend>Ask a question</legend>
-            <div style={{ padding: '8px' }}>
-              {/* Rotating Example Questions Display */}
-              <div style={{ marginBottom: '12px', minHeight: '24px' }}>
-                <div
-                  className="rotating-placeholder"
-                  style={{
-                    fontSize: '11px',
-                    color: '#666',
-                    fontStyle: 'italic',
-                  }}
+            <form onSubmit={handleAsk} style={{ padding: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                <input
+                  type="text"
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  placeholder="e.g., Best sales engagement tool..."
+                  className="win98-input"
+                  style={{ flex: 1, padding: '6px' }}
+                  disabled={loading}
+                />
+                <button
+                  type="submit"
+                  disabled={loading || !question.trim()}
+                  className="win98-button win98-button-default"
+                  style={{ width: '80px' }}
                 >
-                  Try: "{exampleQuestions[currentExampleIndex]}"
-                </div>
+                  {loading ? 'Wait...' : 'Ask'}
+                </button>
               </div>
-
-              <form onSubmit={handleAsk}>
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                  <input
-                    type="text"
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    placeholder="e.g., Best sales engagement tool..."
-                    className="win98-input"
-                    style={{ flex: 1, padding: '6px' }}
-                    disabled={loading}
-                  />
-                  <button
-                    type="submit"
-                    disabled={loading || !question.trim()}
-                    className="win98-button win98-button-default"
-                    style={{ width: '80px' }}
-                  >
-                    {loading ? 'Wait...' : 'Ask'}
-                  </button>
-                </div>
-              </form>
-            </div>
+            </form>
           </div>
 
           {/* Loading Progress */}
@@ -386,8 +341,8 @@ export default function AskPage() {
                     ></div>
                   </div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px' }}>
-                  {['Claude Sonnet 4.5', 'GPT-4o'].map((model, idx) => (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }}>
+                  {['Claude Sonnet 4.5', 'GPT-4o', 'DeepSeek'].map((model, idx) => (
                     <div
                       key={model}
                       className="win98-status-field"
@@ -395,11 +350,11 @@ export default function AskPage() {
                         padding: '4px',
                         textAlign: 'center',
                         fontSize: '10px',
-                        background: loadingProgress > (idx + 1) * 45 ? '#008000' : '#c0c0c0',
-                        color: loadingProgress > (idx + 1) * 45 ? '#ffffff' : '#000000',
+                        background: loadingProgress > (idx + 1) * 30 ? '#008000' : '#c0c0c0',
+                        color: loadingProgress > (idx + 1) * 30 ? '#ffffff' : '#000000',
                       }}
                     >
-                      {loadingProgress > (idx + 1) * 45 ? '√ ' : '⏳ '}
+                      {loadingProgress > (idx + 1) * 30 ? '√ ' : '⏳ '}
                       {model}
                     </div>
                   ))}
@@ -421,7 +376,14 @@ export default function AskPage() {
                   <button
                     onClick={() => {
                       setError(null);
-                      submitQuestion();
+                      if (question.trim()) {
+                        const form = new Event('submit', { bubbles: true, cancelable: true });
+                        Object.defineProperty(form, 'preventDefault', {
+                          value: () => { },
+                          writable: false
+                        });
+                        handleAsk(form as unknown as React.FormEvent);
+                      }
                     }}
                     className="win98-button"
                   >

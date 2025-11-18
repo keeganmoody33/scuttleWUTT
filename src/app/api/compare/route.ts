@@ -5,6 +5,9 @@ import { compareModelResponses } from '@/services/model-comparison';
 import type { LLMModel } from '@/services/llm';
 import { getModelMetadata } from '@/services/llm';
 import { z } from 'zod';
+import { logger } from '@/services/logger';
+import { authorizeRequest } from '@/lib/auth';
+import { enforceRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,13 +20,26 @@ const CompareSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    const { authorized, reason } = authorizeRequest(request);
+    if (!authorized) {
+      return NextResponse.json({ error: reason || 'Unauthorized' }, { status: 401 });
+    }
+
+    const rateLimit = enforceRateLimit(request, 'api:compare');
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many comparison requests. Please slow down.' },
+        { status: 429, headers: { 'Retry-After': Math.ceil(rateLimit.resetInMs / 1000).toString() } }
+      );
+    }
+
     const body = await request.json();
 
     // Validate input
     const validatedData = CompareSchema.parse(body);
     const { question, models } = validatedData;
 
-    console.log(`Comparing ${models.length} models for: "${question}"`);
+    logger.info('Compare API request', { modelCount: models.length, preview: question.slice(0, 80) });
 
     // Call all models in parallel
     const responses = await Promise.all(
@@ -42,7 +58,7 @@ export async function POST(request: NextRequest) {
             success: true,
           };
         } catch (error) {
-          console.error(`Error calling ${model}:`, error);
+          logger.warn('Compare API model call failed', { model, error });
 
           return {
             model: llmModel,
@@ -80,6 +96,12 @@ export async function POST(request: NextRequest) {
 
     // Compare responses
     const comparison = compareModelResponses(successfulResponses);
+
+    logger.info('Compare API completed', {
+      question,
+      succeeded: successfulResponses.length,
+      failed: responses.length - successfulResponses.length,
+    });
 
     // Build response with all data needed for visualizations
     return NextResponse.json({
@@ -121,7 +143,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error in comparison:', error);
+    logger.error('Compare API error', error);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -136,7 +158,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: 'Failed to compare models',
-        details: error instanceof Error ? error.message : 'Unknown error',
+        details: 'Please try again later.',
       },
       { status: 500 }
     );

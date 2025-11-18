@@ -2,6 +2,8 @@ import axios from 'axios';
 import { db, products, productSources, scrapingJobs } from '@/db';
 import { generateId } from '@/lib/utils';
 import { eq } from 'drizzle-orm';
+import { env } from '@/lib/env';
+import { logger } from '@/services/logger';
 
 interface Tweet {
   id: string;
@@ -57,7 +59,7 @@ export async function scrapeTwitter() {
   let productsFound = 0;
   const errors: string[] = [];
 
-  console.log('Starting Twitter scrape...');
+  logger.info('Starting Twitter scrape');
 
   try {
     await db.insert(scrapingJobs).values({
@@ -68,8 +70,7 @@ export async function scrapeTwitter() {
       createdAt: new Date(),
     });
 
-    const bearerToken = process.env.TWITTER_BEARER_TOKEN;
-    if (!bearerToken) {
+    if (!env.TWITTER_BEARER_TOKEN) {
       throw new Error('TWITTER_BEARER_TOKEN not configured');
     }
 
@@ -77,14 +78,14 @@ export async function scrapeTwitter() {
       try {
         const response = await axios.get<TwitterResponse>(TWITTER_API_URL, {
           params: {
-            query: query,
+            query,
             max_results: 20,
             'tweet.fields': 'created_at,public_metrics,entities',
             'user.fields': 'name,username',
             expansions: 'author_id',
           },
           headers: {
-            Authorization: `Bearer ${bearerToken}`,
+            Authorization: `Bearer ${env.TWITTER_BEARER_TOKEN}`,
           },
         });
 
@@ -97,7 +98,6 @@ export async function scrapeTwitter() {
 
         for (const tweet of tweets) {
           try {
-            // Check if we already scraped this tweet
             const existingSource = await db.query.productSources.findFirst({
               where: (sources, { and, eq }) =>
                 and(
@@ -110,36 +110,30 @@ export async function scrapeTwitter() {
               continue;
             }
 
-            // Find author
             const author = users.find((u) => u.id === tweet.author_id);
             if (!author) continue;
 
-            // Extract URL from tweet
             const url = tweet.entities?.urls?.[0]?.expanded_url || '';
             if (!url || url.includes('twitter.com')) {
-              continue; // Skip if no external URL
+              continue;
             }
 
-            // Extract hashtags as categories
             const categories = tweet.entities?.hashtags?.map((h) => h.tag) || [];
 
-            // Calculate engagement score
             const engagement =
               tweet.public_metrics.like_count +
               tweet.public_metrics.retweet_count * 2 +
               tweet.public_metrics.reply_count;
 
-            // Only consider tweets with some engagement
             if (engagement < 5) {
               continue;
             }
 
-            // Create product
             const productId = generateId('prod');
             await db.insert(products).values({
               id: productId,
-              name: this.extractProductName(tweet.text),
-              tagline: this.cleanTweetText(tweet.text),
+              name: extractProductName(tweet.text),
+              tagline: cleanTweetText(tweet.text),
               description: tweet.text,
               url,
               producerName: author.name,
@@ -153,7 +147,6 @@ export async function scrapeTwitter() {
               updatedAt: new Date(),
             });
 
-            // Create source
             await db.insert(productSources).values({
               id: generateId('src'),
               productId,
@@ -165,16 +158,17 @@ export async function scrapeTwitter() {
             });
 
             productsFound++;
-            console.log(`✓ Scraped tweet: ${tweet.text.substring(0, 50)}...`);
+            logger.info('Scraped Twitter launch', { tweetId: tweet.id });
           } catch (err) {
             const error = `Error processing tweet ${tweet.id}: ${err}`;
-            console.error(error);
+            logger.warn('Twitter scraper failed to process tweet', { error });
             errors.push(error);
           }
         }
       } catch (err) {
-        console.error(`Error with query "${query}":`, err);
-        errors.push(`Query "${query}" failed: ${err}`);
+        const errorMsg = `Error with query "${query}"`;
+        logger.warn(errorMsg, { error: err });
+        errors.push(`${errorMsg}: ${err}`);
       }
     }
 
@@ -188,9 +182,9 @@ export async function scrapeTwitter() {
       })
       .where(eq(scrapingJobs.id, jobId));
 
-    console.log(`✓ Twitter scrape completed: ${productsFound} products found`);
+    logger.info('Twitter scrape completed', { productsFound });
   } catch (err) {
-    console.error('Twitter scrape failed:', err);
+    logger.error('Twitter scrape failed', err);
 
     await db
       .update(scrapingJobs)

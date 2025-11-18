@@ -1,6 +1,7 @@
 import { db, products } from '@/db';
 import { eq } from 'drizzle-orm';
 import { calculateDaysSince } from '@/lib/utils';
+import { logger } from '@/services/logger';
 
 interface ScoringWeights {
   recency: number; // How recent is the launch
@@ -126,8 +127,8 @@ export function calculateProductScore(
 
   const overallScore = Math.round(
     recencyScore * weights.recency +
-      socialProofScore * weights.socialProof +
-      qualityScore * weights.quality
+    socialProofScore * weights.socialProof +
+    qualityScore * weights.quality
   );
 
   return {
@@ -142,11 +143,11 @@ export function calculateProductScore(
  * Score all products in the database
  */
 export async function scoreProducts() {
-  console.log('Scoring all products...');
+  logger.info('Starting product scoring job');
 
   const allProducts = await db.query.products.findMany();
 
-  console.log(`Found ${allProducts.length} products to score`);
+  logger.info('Products to score', { count: allProducts.length });
 
   for (const product of allProducts) {
     try {
@@ -162,13 +163,18 @@ export async function scoreProducts() {
         })
         .where(eq(products.id, product.id));
 
-      console.log(
-        `✓ ${product.name}: Overall=${scores.overallScore} (R:${scores.recencyScore}, S:${scores.socialProofScore}, Q:${scores.qualityScore})`
-      );
+      logger.debug('Product scored', {
+        productId: product.id,
+        productName: product.name,
+        overallScore: scores.overallScore,
+        recencyScore: scores.recencyScore,
+        socialProofScore: scores.socialProofScore,
+        qualityScore: scores.qualityScore,
+      });
     } catch (err) {
-      console.error(`Failed to score ${product.name}:`, err);
+      logger.error('Failed to score product', err, { productId: product.id, productName: product.name });
     }
   }
 
-  console.log(`✓ Scoring complete`);
+  logger.info('Product scoring job completed', { totalProducts: allProducts.length });
 }

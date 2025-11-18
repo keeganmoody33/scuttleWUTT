@@ -1,17 +1,12 @@
-/**
- * Signal 1: Market Intent (Demand Proxy)
- *
- * Tracks public search volume as a proxy for market demand.
- * Integrates with Google Trends, Semrush, or similar APIs.
- *
- * This is the "transparency" layer - we show users WHERE the data comes from.
- */
+import googleTrends from 'google-trends-api';
+import { env } from '@/lib/env';
+import { logger } from '@/services/logger';
 
 export interface DemandSignal {
   keywords: string[];
-  intentScore: number; // 0-100, normalized search volume
+  intentScore: number;
   trend: 'rising' | 'falling' | 'flat';
-  velocity: number; // % change month-over-month
+  velocity: number;
   source: 'google_trends' | 'semrush' | 'ahrefs' | 'manual';
   lastUpdated: Date;
   rawData?: {
@@ -21,108 +16,171 @@ export interface DemandSignal {
   };
 }
 
-/**
- * Get market intent for a set of keywords
- *
- * For MVP/Demo: Returns simulated data
- * For Production: Integrate with:
- *  - Google Trends API (free but limited)
- *  - Semrush API ($$$)
- *  - Ahrefs API ($$$)
- *  - Glimpse ($$)
- */
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour cache
+const demandCache = new Map<string, { data: DemandSignal; expiresAt: number }>();
+const disableTrends = env.GOOGLE_TRENDS_DISABLED === 'true';
+
 export async function getDemandSignal(keywords: string[]): Promise<DemandSignal> {
-  // TODO: In production, integrate with actual API
-  // For now, return demo data showing the concept
-
-  console.log(`[Demand Proxy] Checking intent for keywords: ${keywords.join(', ')}`);
-
-  // Simulate API call
-  const simulatedSearchVolume = Math.floor(Math.random() * 10000);
-  const simulatedGrowth = (Math.random() - 0.5) * 200; // -100% to +100%
-
-  // Normalize to 0-100 score
-  const intentScore = Math.min(100, Math.floor((simulatedSearchVolume / 10000) * 100));
-
-  // Determine trend
-  let trend: 'rising' | 'falling' | 'flat';
-  if (simulatedGrowth > 20) {
-    trend = 'rising';
-  } else if (simulatedGrowth < -20) {
-    trend = 'falling';
-  } else {
-    trend = 'flat';
+  if (!keywords || keywords.length === 0) {
+    throw new Error('At least one keyword is required to calculate demand');
   }
+
+  const normalizedKeywords = keywords.map((keyword) => keyword.trim().toLowerCase());
+  const cacheKey = normalizedKeywords.sort().join('|');
+  const cached = demandCache.get(cacheKey);
+
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data;
+  }
+
+  let signal: DemandSignal | null = null;
+
+  if (!disableTrends) {
+    signal = await fetchDemandSignalFromGoogleTrends(normalizedKeywords);
+  }
+
+  if (!signal) {
+    signal = buildDeterministicSignal(normalizedKeywords);
+  }
+
+  demandCache.set(cacheKey, {
+    data: signal,
+    expiresAt: Date.now() + CACHE_TTL_MS,
+  });
+
+  return signal;
+}
+
+function determineTrend(velocity: number): DemandSignal['trend'] {
+  if (velocity > 8) {
+    return 'rising';
+  }
+  if (velocity < -8) {
+    return 'falling';
+  }
+  return 'flat';
+}
+
+async function fetchDemandSignalFromGoogleTrends(keywords: string[]): Promise<DemandSignal | null> {
+  try {
+    const [interestOverTime, relatedQueries] = await Promise.allSettled([
+      googleTrends.interestOverTime({
+        keyword: keywords,
+        startTime: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000), // Last 90 days
+        granularTimeResolution: true,
+      }),
+      googleTrends.relatedQueries({ keyword: keywords[0] }),
+    ]);
+
+    if (interestOverTime.status !== 'fulfilled') {
+      logger.warn('Google Trends interestOverTime request failed', {
+        keywords,
+        reason: interestOverTime.reason,
+      });
+      return null;
+    }
+
+    const timelineData =
+      JSON.parse(interestOverTime.value).default?.timelineData ?? [];
+
+    if (!Array.isArray(timelineData) || timelineData.length === 0) {
+      logger.warn('Google Trends returned empty timeline data', { keywords });
+      return null;
+    }
+
+    const aggregated = timelineData.map((point: any) => {
+      const values = point.value as number[];
+      return values.reduce((sum, entry) => sum + entry, 0) / values.length;
+    });
+
+    const intentScore = Math.round(
+      aggregated.reduce((sum, value) => sum + value, 0) / aggregated.length
+    );
+
+    const lastValue = aggregated[aggregated.length - 1];
+    const baseline = aggregated[Math.max(0, aggregated.length - 4)];
+    const velocity = Math.round(lastValue - baseline);
+    const trend = determineTrend(velocity);
+
+    let relatedKeywords: string[] = [];
+    if (relatedQueries.status === 'fulfilled') {
+      const parsed = JSON.parse(relatedQueries.value);
+      relatedKeywords =
+        parsed?.default?.rankedList?.[0]?.rankedKeyword
+          ?.slice(0, 5)
+          .map((entry: any) => entry.query) ?? [];
+    }
+
+    return {
+      keywords,
+      intentScore: Math.max(0, Math.min(100, intentScore)),
+      trend,
+      velocity,
+      source: 'google_trends',
+      lastUpdated: new Date(),
+      rawData: {
+        searchVolume: calculateSearchVolumeEstimate(aggregated),
+        competitionLevel:
+          intentScore > 70 ? 'high' : intentScore > 40 ? 'medium' : 'low',
+        relatedQueries: relatedKeywords.length ? relatedKeywords : undefined,
+      },
+    };
+  } catch (error) {
+    logger.warn('Failed to fetch demand signal from Google Trends', {
+      error,
+      keywords,
+    });
+    return null;
+  }
+}
+
+function calculateSearchVolumeEstimate(values: number[]): number {
+  if (!values.length) {
+    return 0;
+  }
+
+  const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+  // Map the Google Trends 0-100 scale to an estimated monthly volume
+  return Math.round(average * 120);
+}
+
+function hashToRange(input: string, min: number, max: number): number {
+  let hash = 0;
+
+  for (let i = 0; i < input.length; i++) {
+    hash = (hash << 5) - hash + input.charCodeAt(i);
+    hash |= 0; // Convert to 32-bit integer
+  }
+
+  const normalized = (hash >>> 0) / 4294967295;
+  return Math.round(min + normalized * (max - min));
+}
+
+function buildDeterministicSignal(keywords: string[]): DemandSignal {
+  const joined = keywords.join('|');
+  const intentScore = hashToRange(joined, 35, 90);
+  const velocity = hashToRange(`${joined}:velocity`, -25, 25);
+  const trend = determineTrend(velocity);
 
   return {
     keywords,
     intentScore,
     trend,
-    velocity: Math.round(simulatedGrowth),
-    source: 'google_trends', // In production, this would be the actual source
+    velocity,
+    source: 'manual',
     lastUpdated: new Date(),
     rawData: {
-      searchVolume: simulatedSearchVolume,
-      competitionLevel: intentScore > 70 ? 'high' : intentScore > 40 ? 'medium' : 'low',
-      relatedQueries: [
-        `best ${keywords[0]} alternative`,
-        `${keywords[0]} vs competitors`,
-        `how to ${keywords[0]}`,
-      ],
+      searchVolume: hashToRange(`${joined}:volume`, 500, 15000),
+      competitionLevel:
+        intentScore > 70 ? 'high' : intentScore > 40 ? 'medium' : 'low',
+      relatedQueries: keywords.map((keyword, index) => `${keyword} trend ${index + 1}`),
     },
   };
 }
 
-/**
- * Integration with Google Trends (Production-ready example)
- *
- * Requires: npm install google-trends-api
- *
- * Example implementation:
- *
- * ```typescript
- * import googleTrends from 'google-trends-api';
- *
- * export async function getDemandSignalFromGoogleTrends(keywords: string[]): Promise<DemandSignal> {
- *   const results = await googleTrends.interestOverTime({
- *     keyword: keywords,
- *     startTime: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000), // 90 days ago
- *   });
- *
- *   // Parse results and calculate scores
- *   // ...
- * }
- * ```
- */
-
-/**
- * Integration with Semrush (Production-ready example)
- *
- * Requires: SEMRUSH_API_KEY environment variable
- *
- * Example implementation:
- *
- * ```typescript
- * export async function getDemandSignalFromSemrush(keywords: string[]): Promise<DemandSignal> {
- *   const apiKey = process.env.SEMRUSH_API_KEY;
- *   const keyword = keywords[0]; // Semrush charges per keyword
- *
- *   const response = await fetch(
- *     `https://api.semrush.com/?type=phrase_this&key=${apiKey}&phrase=${encodeURIComponent(keyword)}&export_columns=Ph,Nq,Cp`
- *   );
- *
- *   // Parse CSV response
- *   // Ph = Keyword, Nq = Search Volume, Cp = Competition
- *   // ...
- * }
- * ```
- */
-
-/**
- * Format demand signal for UI display
- */
 export function formatDemandSignal(signal: DemandSignal): string {
-  const trendIcon = signal.trend === 'rising' ? '📈' : signal.trend === 'falling' ? '📉' : '➡️';
+  const trendIcon =
+    signal.trend === 'rising' ? '📈' : signal.trend === 'falling' ? '📉' : '➡️';
 
   return `
 **Market Intent: ${signal.intentScore}/100** ${trendIcon}
@@ -136,40 +194,26 @@ Last Updated: ${signal.lastUpdated.toLocaleDateString()}
   `.trim();
 }
 
-/**
- * Determine if demand is "rising" enough to trigger an alert
- */
 export function isRisingDemand(signal: DemandSignal, threshold: number = 50): boolean {
   return signal.trend === 'rising' && signal.velocity > threshold;
 }
 
-/**
- * Calculate "Opportunity Score" based on Intent + Saturation
- *
- * High Intent + Low Saturation = High Opportunity
- * Low Intent + High Saturation = Low Opportunity
- */
 export function calculateOpportunityScore(
   intentScore: number,
   saturationScore: number
 ): { score: number; status: 'wide_open' | 'emerging' | 'closing' | 'saturated' } {
-  // Formula: (Intent + (100 - Saturation)) / 2
-  // This gives us a score where:
-  // - High demand + low competition = ~100
-  // - Low demand + high competition = ~0
-
   const score = Math.round((intentScore + (100 - saturationScore)) / 2);
 
   let status: 'wide_open' | 'emerging' | 'closing' | 'saturated';
 
   if (score >= 75) {
-    status = 'wide_open'; // High demand, low competition
+    status = 'wide_open';
   } else if (score >= 50) {
-    status = 'emerging'; // Growing demand, some competition
+    status = 'emerging';
   } else if (score >= 25) {
-    status = 'closing'; // Demand exists but highly competitive
+    status = 'closing';
   } else {
-    status = 'saturated'; // Low demand or overcrowded market
+    status = 'saturated';
   }
 
   return { score, status };

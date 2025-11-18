@@ -2,6 +2,7 @@ import { db, answerSnapshots } from '@/db';
 import { generateId } from '@/lib/utils';
 import { eq, desc } from 'drizzle-orm';
 import type { QuestionAnswer } from './question-answering';
+import { logger } from '@/services/logger';
 
 export interface Tool {
   name: string;
@@ -46,7 +47,7 @@ export async function createSnapshot(
     createdAt: new Date(),
   });
 
-  console.log(`✓ Created snapshot ${snapshotId} for question ${questionId}`);
+  logger.debug('Snapshot created', { snapshotId, questionId, modelUsed });
 
   return snapshotId;
 }
@@ -181,14 +182,14 @@ export function formatDiffAsHTML(diff: SnapshotDiff): string {
       <div style="margin-bottom: 16px;">
         <h3 style="color: #10b981; margin: 0 0 8px 0; font-size: 14px; font-weight: 600;">🆕 NEW ENTRIES</h3>
         ${diff.added
-          .map(
-            (tool) => `
+        .map(
+          (tool) => `
           <div style="padding: 8px 0; border-left: 3px solid #10b981; padding-left: 12px; margin-bottom: 8px;">
             <strong>${tool.name}</strong> - ${tool.description}
           </div>
         `
-          )
-          .join('')}
+        )
+        .join('')}
       </div>
     `);
   }
@@ -198,14 +199,14 @@ export function formatDiffAsHTML(diff: SnapshotDiff): string {
       <div style="margin-bottom: 16px;">
         <h3 style="color: #ef4444; margin: 0 0 8px 0; font-size: 14px; font-weight: 600;">❌ REMOVED</h3>
         ${diff.removed
-          .map(
-            (tool) => `
+        .map(
+          (tool) => `
           <div style="padding: 8px 0; border-left: 3px solid #ef4444; padding-left: 12px; margin-bottom: 8px; opacity: 0.7;">
             ${tool.name}
           </div>
         `
-          )
-          .join('')}
+        )
+        .join('')}
       </div>
     `);
   }
@@ -215,8 +216,8 @@ export function formatDiffAsHTML(diff: SnapshotDiff): string {
       <div style="margin-bottom: 16px;">
         <h3 style="color: #3b82f6; margin: 0 0 8px 0; font-size: 14px; font-weight: 600;">📊 RANKING CHANGES</h3>
         ${diff.moved
-          .map(
-            ({ tool, oldRank, newRank, direction }) => `
+        .map(
+          ({ tool, oldRank, newRank, direction }) => `
           <div style="padding: 8px 0; border-left: 3px solid #3b82f6; padding-left: 12px; margin-bottom: 8px;">
             <strong>${tool.name}</strong>:
             <span style="color: ${direction === 'up' ? '#10b981' : '#ef4444'};">
@@ -224,8 +225,8 @@ export function formatDiffAsHTML(diff: SnapshotDiff): string {
             </span>
           </div>
         `
-          )
-          .join('')}
+        )
+        .join('')}
       </div>
     `);
   }

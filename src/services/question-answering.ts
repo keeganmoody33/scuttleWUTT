@@ -1,4 +1,5 @@
 import { callLLM, type LLMModel } from './llm';
+import { logger } from '@/services/logger';
 
 export interface Tool {
   name: string;
@@ -45,10 +46,11 @@ export async function answerQuestion(
   question: string,
   model: LLMModel = 'claude-sonnet-4-5'
 ): Promise<QuestionAnswer> {
+  const trimmedQuestion = question.trim();
   try {
-    console.log(`Answering question with ${model}: "${question}"`);
+    logger.info('Answering question', { model, preview: trimmedQuestion.slice(0, 80) });
 
-    const userMessage = `User question: "${question}"\n\nProvide 3-5 accurate, recent tool recommendations that address this question. Focus on SaaS tools and software products with real traction. Return ONLY the JSON object, no other text.`;
+    const userMessage = `User question: "${trimmedQuestion}"\n\nProvide 3-5 accurate, recent tool recommendations that address this question. Focus on SaaS tools and software products with real traction. Return ONLY the JSON object, no other text.`;
 
     const response = await callLLM(model, SCUTTLE_WHAT_PROMPT, userMessage, 4096);
 
@@ -83,15 +85,18 @@ export async function answerQuestion(
       }
     }
 
-    console.log(`✓ Generated answer with ${parsed.tools.length} tools`);
+    logger.info('Generated tool recommendations', {
+      model,
+      toolCount: parsed.tools.length,
+    });
 
     return {
       tools: parsed.tools,
       generatedAt: new Date().toISOString(),
     };
   } catch (error) {
-    console.error('Error answering question:', error);
-    throw new Error(`Failed to generate answer: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    logger.error('Error answering question', error, { model });
+    throw new Error('Failed to generate answer');
   }
 }
 

@@ -2,8 +2,10 @@ import { db, products, users, userPreferences, digests } from '@/db';
 import { and, eq, gte, notInArray, sql } from 'drizzle-orm';
 import { generateId } from '@/lib/utils';
 import { Resend } from 'resend';
+import { env } from '@/lib/env';
+import { logger } from '@/services/logger';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(env.RESEND_API_KEY);
 
 interface DigestProduct {
   id: string;
@@ -107,6 +109,7 @@ function generateDigestEmail(
   userName: string | null,
   products: DigestProduct[]
 ): string {
+  const appUrl = env.NEXT_PUBLIC_APP_URL || 'https://scuttlewhat.com';
   const productCards = products
     .map(
       (product) => `
@@ -185,8 +188,8 @@ function generateDigestEmail(
         ${productCards}
 
         <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #e5e7eb; text-align: center; color: #9ca3af; font-size: 12px;">
-          <p>Want to adjust your preferences? <a href="${process.env.NEXT_PUBLIC_APP_URL}/settings" style="color: #3b82f6;">Update settings</a></p>
-          <p>Don't want these emails? <a href="${process.env.NEXT_PUBLIC_APP_URL}/unsubscribe" style="color: #6b7280;">Unsubscribe</a></p>
+          <p>Want to adjust your preferences? <a href="${appUrl}/settings" style="color: #3b82f6;">Update settings</a></p>
+          <p>Don't want these emails? <a href="${appUrl}/unsubscribe" style="color: #6b7280;">Unsubscribe</a></p>
         </div>
       </div>
     </body>
@@ -211,7 +214,7 @@ export async function sendDigestToUser(userId: string): Promise<void> {
   });
 
   if (!prefs?.emailEnabled) {
-    console.log(`Email disabled for user ${userId}`);
+    logger.info('Skipping digest because email notifications disabled', { userId });
     return;
   }
 
@@ -219,7 +222,7 @@ export async function sendDigestToUser(userId: string): Promise<void> {
   const products = await getPersonalizedProducts(userId);
 
   if (products.length === 0) {
-    console.log(`No products to send to user ${userId}`);
+    logger.info('No personalized products found, skipping digest', { userId });
     return;
   }
 
@@ -242,14 +245,14 @@ export async function sendDigestToUser(userId: string): Promise<void> {
     sentAt: new Date(),
   });
 
-  console.log(`✓ Sent digest to ${user.email} (${products.length} products)`);
+  logger.info('Sent digest email', { email: user.email, productCount: products.length });
 }
 
 /**
  * Generate and send digests to all eligible users
  */
 export async function generateDigestsForAllUsers(): Promise<void> {
-  console.log('Generating digests for all users...');
+  logger.info('Starting digest generation job');
 
   const allUsers = await db.query.users.findMany({
     with: {
@@ -301,9 +304,9 @@ export async function generateDigestsForAllUsers(): Promise<void> {
         await sendDigestToUser(user.id);
       }
     } catch (err) {
-      console.error(`Failed to send digest to user ${user.id}:`, err);
+      logger.error('Failed to send digest to user', err, { userId: user.id });
     }
   }
 
-  console.log('✓ Digest generation complete');
+  logger.info('Digest generation job finished');
 }

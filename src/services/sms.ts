@@ -1,12 +1,24 @@
 import twilio from 'twilio';
 import { formatAnswerAsText, type QuestionAnswer } from './question-answering';
+import { env } from '@/lib/env';
+import { logger } from '@/services/logger';
 
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
+const hasTwilioConfig =
+  Boolean(env.TWILIO_ACCOUNT_SID) &&
+  Boolean(env.TWILIO_AUTH_TOKEN) &&
+  Boolean(env.TWILIO_PHONE_NUMBER);
 
-const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
+const twilioClient = hasTwilioConfig
+  ? twilio(env.TWILIO_ACCOUNT_SID as string, env.TWILIO_AUTH_TOKEN as string)
+  : null;
+
+function requireTwilioClient() {
+  if (!twilioClient || !env.TWILIO_PHONE_NUMBER) {
+    throw new Error('Twilio is not configured');
+  }
+
+  return { client: twilioClient, from: env.TWILIO_PHONE_NUMBER };
+}
 
 /**
  * Format answer for SMS (shorter, text-only)
@@ -27,46 +39,45 @@ export function formatAnswerForSMS(answer: QuestionAnswer, question: string): st
   return lines.join('\n');
 }
 
-/**
- * Send SMS update
- */
+export async function sendSMSMessage(phone: string, body: string): Promise<void> {
+  const { client, from } = requireTwilioClient();
+  await client.messages.create({
+    body,
+    from,
+    to: phone,
+  });
+  logger.info('Sent SMS message', { phone });
+}
+
+export async function sendVerificationCodeSMS(phone: string, verificationCode: string): Promise<void> {
+  const verificationBody = `Scuttle What verification code: ${verificationCode}\n\nEnter this code to activate your subscription. Expires in 10 minutes.`;
+  await sendSMSMessage(phone, verificationBody);
+}
+
 export async function sendSMSUpdate(
   phone: string,
   question: string,
   answer: QuestionAnswer,
   changesSummary?: string
 ): Promise<void> {
-  if (!TWILIO_PHONE_NUMBER) {
-    throw new Error('TWILIO_PHONE_NUMBER not configured');
-  }
+  const { } = requireTwilioClient(); // Throws early if misconfigured
 
-  // Format answer for SMS
   let body = formatAnswerForSMS(answer, question);
 
-  // Prepend changes summary if provided
   if (changesSummary) {
-    body = changesSummary + body;
+    body = `${changesSummary}${body}`;
   }
 
-  // Check if message is too long (SMS limit is 1600 chars)
   if (body.length > 1600) {
-    // Send shorter version
-    const shortBody = `Scuttle What Update: "${question}"\n\n${answer.tools.length} tools found. Visit scuttlewhat.com to see full details.\n\n${answer.tools.map((t, i) => `${i + 1}. ${t.name} - ${t.link}`).join('\n')}`;
-
-    await twilioClient.messages.create({
-      body: shortBody,
-      from: TWILIO_PHONE_NUMBER,
-      to: phone,
-    });
+    const shortBody = `Scuttle What Update: "${question}"\n\n${answer.tools.length} tools found. Visit scuttlewhat.com to see full details.\n\n${answer.tools
+      .map((tool, index) => `${index + 1}. ${tool.name} - ${tool.link}`)
+      .join('\n')}`;
+    await sendSMSMessage(phone, shortBody);
   } else {
-    await twilioClient.messages.create({
-      body,
-      from: TWILIO_PHONE_NUMBER,
-      to: phone,
-    });
+    await sendSMSMessage(phone, body);
   }
 
-  console.log(`✓ Sent SMS to ${phone}`);
+  logger.info('Sent SMS update', { phone, question });
 }
 
 /**
