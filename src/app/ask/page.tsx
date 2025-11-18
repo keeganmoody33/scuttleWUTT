@@ -32,13 +32,24 @@ interface Tool {
   link: string;
 }
 
+interface ModelStatus {
+  model: string;
+  modelName: string;
+  provider: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  error?: string;
+}
+
 interface Answer {
   questionId: string;
   question: string;
   answer: {
-    tools: Tool[];
+    tools?: Tool[];
+    factualAnswer?: string;
+    answerType: 'tools' | 'factual';
     generatedAt: string;
   };
+  modelStatus?: ModelStatus[];
   trustBadge?: {
     modelsUsed: number;
     modelsQueried: number;
@@ -73,6 +84,7 @@ export default function AskPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState('Loading...');
   const [currentExampleIndex, setCurrentExampleIndex] = useState(0);
+  const [modelStatuses, setModelStatuses] = useState<ModelStatus[]>([]);
 
   // Example questions that rotate
   const exampleQuestions = [
@@ -129,11 +141,14 @@ export default function AskPage() {
     setShowSubscribe(false);
     setSubscribed(false);
 
+    // Initialize model statuses as pending
+    setModelStatuses([]);
+
     // Simulate progress for better UX
     const progressInterval = setInterval(() => {
       setLoadingProgress((prev) => {
         if (prev >= 90) return prev; // Cap at 90% until real response
-        return prev + Math.random() * 15;
+        return prev + Math.random() * 10;
       });
     }, 500);
 
@@ -152,6 +167,12 @@ export default function AskPage() {
       const data = await response.json();
       setLoadingProgress(100);
       setAnswer(data);
+      
+      // Update model statuses from response
+      if (data.modelStatus) {
+        setModelStatuses(data.modelStatus);
+      }
+      
       setShowSubscribe(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
@@ -386,24 +407,55 @@ export default function AskPage() {
                     ></div>
                   </div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px' }}>
-                  {['Claude Sonnet 4.5', 'GPT-4o'].map((model, idx) => (
-                    <div
-                      key={model}
-                      className="win98-status-field"
-                      style={{
-                        padding: '4px',
-                        textAlign: 'center',
-                        fontSize: '10px',
-                        background: loadingProgress > (idx + 1) * 40 ? '#008000' : '#c0c0c0',
-                        color: loadingProgress > (idx + 1) * 40 ? '#ffffff' : '#000000',
-                      }}
-                    >
-                      {loadingProgress > (idx + 1) * 40 ? '√ ' : '⏳ '}
-                      {model}
-                    </div>
-                  ))}
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', 
+                  gap: '4px',
+                  maxHeight: '200px',
+                  overflowY: 'auto'
+                }}>
+                  {modelStatuses.length > 0 ? (
+                    modelStatuses.map((model, idx) => (
+                      <div
+                        key={model.model}
+                        className="win98-status-field"
+                        style={{
+                          padding: '4px',
+                          textAlign: 'center',
+                          fontSize: '9px',
+                          background: model.status === 'completed' ? '#008000' : model.status === 'failed' ? '#ff0000' : '#c0c0c0',
+                          color: model.status === 'completed' ? '#ffffff' : model.status === 'failed' ? '#ffffff' : '#000000',
+                        }}
+                        title={model.status === 'failed' ? model.error : model.modelName}
+                      >
+                        {model.status === 'completed' ? '✓ ' : model.status === 'failed' ? '✗ ' : '⏳ '}
+                        {model.modelName}
+                      </div>
+                    ))
+                  ) : (
+                    // Show placeholder while loading
+                    Array.from({ length: Math.max(2, Math.ceil(loadingProgress / 10)) }).map((_, idx) => (
+                      <div
+                        key={idx}
+                        className="win98-status-field"
+                        style={{
+                          padding: '4px',
+                          textAlign: 'center',
+                          fontSize: '9px',
+                          background: '#c0c0c0',
+                          color: '#000000',
+                        }}
+                      >
+                        ⏳ Loading...
+                      </div>
+                    ))
+                  )}
                 </div>
+                {modelStatuses.length > 0 && (
+                  <div style={{ marginTop: '8px', fontSize: '10px', color: '#666', textAlign: 'center' }}>
+                    {modelStatuses.filter(m => m.status === 'completed').length} / {modelStatuses.length} models completed
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -441,50 +493,64 @@ export default function AskPage() {
           {/* Answer */}
           {answer && (
             <div style={{ marginBottom: '16px' }}>
-              {/* Tools */}
-              <div style={{ marginBottom: '16px' }}>
-                {answer.answer.tools.map((tool, index) => (
-                  <div key={index} className="win98-groupbox" style={{ marginBottom: '12px' }}>
-                    <legend>Tool #{index + 1}</legend>
-                    <div style={{ padding: '8px' }}>
-                      <p className="win98-text-lg win98-text-bold" style={{ marginBottom: '4px' }}>
-                        <a
-                          href={tool.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="win98-link"
-                        >
-                          {tool.name}
-                        </a>
-                      </p>
-                      <p style={{ marginBottom: '8px', fontSize: '11px' }}>{tool.description}</p>
+              {/* Factual Answer */}
+              {answer.answer.answerType === 'factual' && answer.answer.factualAnswer && (
+                <div className="win98-groupbox" style={{ marginBottom: '16px' }}>
+                  <legend>Answer</legend>
+                  <div style={{ padding: '16px' }}>
+                    <p style={{ fontSize: '14px', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                      {answer.answer.factualAnswer}
+                    </p>
+                  </div>
+                </div>
+              )}
 
-                      <div style={{ fontSize: '11px', lineHeight: '1.6' }}>
-                        <div style={{ marginBottom: '4px' }}>
-                          <span className="win98-text-bold">Maker:</span> {tool.maker}
+              {/* Tools */}
+              {answer.answer.answerType === 'tools' && answer.answer.tools && (
+                <div style={{ marginBottom: '16px' }}>
+                  {answer.answer.tools.map((tool, index) => (
+                    <div key={index} className="win98-groupbox" style={{ marginBottom: '12px' }}>
+                      <legend>Tool #{index + 1}</legend>
+                      <div style={{ padding: '8px' }}>
+                        <p className="win98-text-lg win98-text-bold" style={{ marginBottom: '4px' }}>
+                          <a
+                            href={tool.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="win98-link"
+                          >
+                            {tool.name}
+                          </a>
+                        </p>
+                        <p style={{ marginBottom: '8px', fontSize: '11px' }}>{tool.description}</p>
+
+                        <div style={{ fontSize: '11px', lineHeight: '1.6' }}>
+                          <div style={{ marginBottom: '4px' }}>
+                            <span className="win98-text-bold">Maker:</span> {tool.maker}
+                          </div>
+                          <div style={{ marginBottom: '4px' }}>
+                            <span className="win98-text-bold">Use case:</span> {tool.useCase}
+                          </div>
+                          <div style={{ marginBottom: '4px', color: '#008000' }}>
+                            <span className="win98-text-bold">Proof:</span> {tool.proof}
+                          </div>
+                          <div style={{ marginBottom: '8px', color: '#808000' }}>
+                            <span className="win98-text-bold">Downside:</span> {tool.downside}
+                          </div>
+                          <a
+                            href={tool.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="win98-link"
+                          >
+                            → Visit website
+                          </a>
                         </div>
-                        <div style={{ marginBottom: '4px' }}>
-                          <span className="win98-text-bold">Use case:</span> {tool.useCase}
-                        </div>
-                        <div style={{ marginBottom: '4px', color: '#008000' }}>
-                          <span className="win98-text-bold">Proof:</span> {tool.proof}
-                        </div>
-                        <div style={{ marginBottom: '8px', color: '#808000' }}>
-                          <span className="win98-text-bold">Downside:</span> {tool.downside}
-                        </div>
-                        <a
-                          href={tool.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="win98-link"
-                        >
-                          → Visit website
-                        </a>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
 
               {/* Trust Badge */}
               {answer.trustBadge && (
@@ -533,7 +599,7 @@ export default function AskPage() {
                 </div>
               )}
 
-              {/* Timeline Link */}
+              {/* Timeline Link - Only show if subscribed or if answer has snapshots */}
               <div style={{ marginBottom: '16px' }}>
                 <Link
                   href={`/question/${answer.questionId}/timeline`}
@@ -542,6 +608,9 @@ export default function AskPage() {
                 >
                   📊 View Answer Timeline
                 </Link>
+                <p style={{ fontSize: '10px', color: '#666', textAlign: 'center', marginTop: '4px' }}>
+                  Track how this answer changes over time
+                </p>
               </div>
 
               {/* Subscribe Section */}
@@ -779,7 +848,11 @@ export default function AskPage() {
             Ready | Powered by AI Consensus
           </div>
           <div className="win98-status-field">
-            {answer ? `${answer.answer.tools.length} tools found` : 'No results'}
+            {answer 
+              ? answer.answer.answerType === 'factual' 
+                ? 'Factual answer' 
+                : `${answer.answer.tools?.length || 0} tools found`
+              : 'No results'}
           </div>
           <div className="win98-status-field">
             {currentTime}

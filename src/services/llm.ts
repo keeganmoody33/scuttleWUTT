@@ -649,3 +649,77 @@ export function getDefaultComparisonModels(): LLMModel[] {
     'gemini-1.5-pro', // Google's best (when available)
   ];
 }
+
+/**
+ * Get all models that are available based on configured API keys
+ * Useful for debugging and admin interfaces
+ */
+export function getAvailableModelsByKey(): {
+  available: LLMModel[];
+  unavailable: { model: LLMModel; reason: string }[];
+  providers: Record<string, boolean>;
+} {
+  const available: LLMModel[] = [];
+  const unavailable: { model: LLMModel; reason: string }[] = [];
+  
+  const providers = {
+    anthropic: !!process.env.ANTHROPIC_API_KEY,
+    openai: !!process.env.OPENAI_API_KEY,
+    deepseek: !!process.env.DEEPSEEK_API_KEY,
+    openrouter: !!process.env.OPENROUTER_API_KEY,
+    perplexity: !!process.env.PERPLEXITY_API_KEY,
+    google: false, // Not yet integrated
+  };
+
+  // Anthropic models
+  if (providers.anthropic) {
+    available.push('claude-sonnet-4-5', 'claude-opus-4', 'claude-3-5-sonnet', 'claude-3-5-haiku', 'claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku');
+  } else {
+    unavailable.push(
+      { model: 'claude-sonnet-4-5', reason: 'ANTHROPIC_API_KEY not set' },
+      { model: 'claude-opus-4', reason: 'ANTHROPIC_API_KEY not set' }
+    );
+  }
+
+  // OpenAI models
+  if (providers.openai) {
+    available.push('gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo');
+  } else {
+    unavailable.push(
+      { model: 'gpt-4o', reason: 'OPENAI_API_KEY not set' },
+      { model: 'gpt-4o-mini', reason: 'OPENAI_API_KEY not set' }
+    );
+  }
+
+  // DeepSeek models
+  if (providers.deepseek) {
+    available.push('deepseek-chat', 'deepseek-coder');
+  } else {
+    unavailable.push({ model: 'deepseek-chat', reason: 'DEEPSEEK_API_KEY not set' });
+  }
+
+  // OpenRouter models (Llama, Mistral)
+  if (providers.openrouter) {
+    available.push('llama-3.3-70b', 'llama-3.1-405b', 'llama-3.1-70b', 'mistral-large', 'mistral-medium', 'mistral-small');
+  } else {
+    unavailable.push(
+      { model: 'llama-3.3-70b', reason: 'OPENROUTER_API_KEY not set' },
+      { model: 'mistral-large', reason: 'OPENROUTER_API_KEY not set' }
+    );
+  }
+
+  // Perplexity models
+  if (providers.perplexity) {
+    available.push('perplexity-sonar-pro', 'perplexity-sonar');
+  } else {
+    unavailable.push({ model: 'perplexity-sonar-pro', reason: 'PERPLEXITY_API_KEY not set' });
+  }
+
+  // Gemini models (not yet integrated)
+  unavailable.push(
+    { model: 'gemini-2.0-flash', reason: 'Google AI SDK not yet integrated' },
+    { model: 'gemini-1.5-pro', reason: 'Google AI SDK not yet integrated' }
+  );
+
+  return { available, unavailable, providers };
+}

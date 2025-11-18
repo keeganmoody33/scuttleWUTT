@@ -6,7 +6,6 @@ import { and, eq } from 'drizzle-orm';
 import { env } from '@/lib/env';
 import { logger } from '@/services/logger';
 import { sendVerificationCodeSMS, formatPhoneNumber, validatePhoneNumber } from '@/services/sms';
-import { authorizeRequest } from '@/lib/auth';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
@@ -38,11 +37,7 @@ const SubscribeSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const { authorized, reason } = authorizeRequest(request);
-    if (!authorized) {
-      return NextResponse.json({ error: reason || 'Unauthorized' }, { status: 401 });
-    }
-
+    // Public endpoint - no auth required (users need to subscribe)
     const rateLimit = enforceRateLimit(request, 'api:subscribe');
     if (!rateLimit.allowed) {
       return NextResponse.json(
