@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Search, Loader2, Mail, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import WUTTFlag from '@/components/WUTTFlag';
+import type { QuestionAnalysis } from '@/services/question-grader';
 
 // Add metadata via client-side head update
 if (typeof document !== 'undefined') {
@@ -111,6 +112,11 @@ export default function AskPage() {
   const [verifying, setVerifying] = useState(false);
   const [verificationError, setVerificationError] = useState<string | null>(null);
 
+  // Question analysis state (Question Sandbox)
+  const [analysis, setAnalysis] = useState<QuestionAnalysis | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [showSandbox, setShowSandbox] = useState(true); // Can be toggled
+
   // Update time every second (client-side only)
   useEffect(() => {
     const updateTime = () => {
@@ -128,6 +134,44 @@ export default function AskPage() {
     }, 4000);
     return () => clearInterval(interval);
   }, [exampleQuestions.length]);
+
+  // Debounced question analysis (Question Sandbox)
+  useEffect(() => {
+    // Only analyze if sandbox is enabled and question is long enough
+    if (!showSandbox || question.length < 10) {
+      setAnalysis(null);
+      return;
+    }
+
+    setAnalyzing(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch('/api/analyze-question', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to analyze question');
+        }
+
+        const result = await response.json();
+        setAnalysis(result);
+      } catch (error) {
+        console.error('Question analysis failed:', error);
+        setAnalysis(null);
+      } finally {
+        setAnalyzing(false);
+      }
+    }, 800); // 800ms debounce for better UX
+
+    return () => {
+      clearTimeout(timer);
+      setAnalyzing(false);
+    };
+  }, [question, showSandbox]);
 
   // Core submission logic extracted for reuse
   const submitQuestion = async () => {
@@ -389,6 +433,197 @@ export default function AskPage() {
               </form>
             </div>
           </div>
+
+          {/* Question Quality Analysis (Question Sandbox) */}
+          {showSandbox && !loading && !answer && question.length >= 10 && (
+            <div className="win98-groupbox" style={{ marginBottom: '16px' }}>
+              <legend>
+                {analyzing ? '🔍 Analyzing...' : analysis ? '📊 Question Quality Analysis' : '💭 Question Sandbox'}
+              </legend>
+              <div style={{ padding: '8px' }}>
+                {analyzing && (
+                  <div style={{ textAlign: 'center', padding: '16px' }}>
+                    <div className="win98-progress-bar" style={{ width: '100%' }}>
+                      <div className="win98-progress-fill" style={{ width: '50%' }}></div>
+                    </div>
+                    <p className="win98-text-xs" style={{ marginTop: '4px', color: '#666' }}>
+                      Evaluating question quality...
+                    </p>
+                  </div>
+                )}
+
+                {!analyzing && analysis && (
+                  <div>
+                    {/* Quality Score Header */}
+                    <div
+                      style={{
+                        padding: '8px',
+                        marginBottom: '12px',
+                        background:
+                          analysis.score >= 7
+                            ? '#c8f0c8'
+                            : analysis.score >= 5
+                            ? '#ffffcc'
+                            : '#ffcccc',
+                        border: '2px solid',
+                        borderColor:
+                          analysis.score >= 7
+                            ? '#008000'
+                            : analysis.score >= 5
+                            ? '#808000'
+                            : '#cc0000',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <span className="win98-text-lg win98-text-bold">
+                            Quality Score: {analysis.score}/10
+                          </span>
+                          <span
+                            style={{
+                              marginLeft: '8px',
+                              padding: '2px 6px',
+                              background: '#ffffff',
+                              border: '1px solid #000',
+                              fontSize: '10px',
+                              fontWeight: 'bold',
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            {analysis.grade}
+                          </span>
+                        </div>
+                        <div className="win98-text-sm" style={{ color: '#666' }}>
+                          Est. cost: ${analysis.estimatedCost.toFixed(3)}
+                        </div>
+                      </div>
+                      <p className="win98-text-sm" style={{ marginTop: '4px' }}>
+                        {analysis.reasoning}
+                      </p>
+                    </div>
+
+                    {/* Metadata Grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', marginBottom: '12px' }}>
+                      <div className="win98-field-border" style={{ padding: '4px', textAlign: 'center' }}>
+                        <div className="win98-text-xs" style={{ marginBottom: '2px' }}>Category</div>
+                        <div className="win98-text-sm win98-text-bold" style={{ textTransform: 'capitalize' }}>
+                          {analysis.category}
+                        </div>
+                      </div>
+                      <div className="win98-field-border" style={{ padding: '4px', textAlign: 'center' }}>
+                        <div className="win98-text-xs" style={{ marginBottom: '2px' }}>Temporal Value</div>
+                        <div className="win98-text-sm win98-text-bold" style={{ textTransform: 'capitalize' }}>
+                          {analysis.temporalValue}
+                        </div>
+                      </div>
+                      <div className="win98-field-border" style={{ padding: '4px', textAlign: 'center' }}>
+                        <div className="win98-text-xs" style={{ marginBottom: '2px' }}>Consensus Likelihood</div>
+                        <div className="win98-text-sm win98-text-bold" style={{ textTransform: 'capitalize' }}>
+                          {analysis.consensusLikelihood}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Strengths */}
+                    {analysis.strengths.length > 0 && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <div className="win98-text-sm win98-text-bold" style={{ marginBottom: '4px', color: '#008000' }}>
+                          ✓ Strengths:
+                        </div>
+                        <div style={{ paddingLeft: '8px' }}>
+                          {analysis.strengths.map((strength, idx) => (
+                            <div key={idx} className="win98-text-xs" style={{ marginBottom: '2px', color: '#008000' }}>
+                              • {strength}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Issues */}
+                    {analysis.issues.length > 0 && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <div className="win98-text-sm win98-text-bold" style={{ marginBottom: '4px', color: '#cc0000' }}>
+                          ✗ Issues:
+                        </div>
+                        <div style={{ paddingLeft: '8px' }}>
+                          {analysis.issues.map((issue, idx) => (
+                            <div key={idx} className="win98-text-xs" style={{ marginBottom: '2px', color: '#cc0000' }}>
+                              • {issue}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Suggestions */}
+                    {analysis.suggestions.length > 0 && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <div className="win98-text-sm win98-text-bold" style={{ marginBottom: '4px', color: '#000080' }}>
+                          💡 Suggestions:
+                        </div>
+                        <div style={{ paddingLeft: '8px' }}>
+                          {analysis.suggestions.map((suggestion, idx) => (
+                            <div key={idx} className="win98-text-xs" style={{ marginBottom: '2px', color: '#000080' }}>
+                              → {suggestion}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                      {analysis.score >= 5 && (
+                        <button
+                          onClick={handleAsk}
+                          className="win98-button win98-button-default"
+                          style={{ flex: 1, padding: '6px' }}
+                        >
+                          ✓ Proceed with Query
+                        </button>
+                      )}
+                      {analysis.score < 5 && (
+                        <div
+                          style={{
+                            flex: 1,
+                            padding: '8px',
+                            background: '#ffeecc',
+                            border: '1px solid #cc8800',
+                            fontSize: '10px',
+                            textAlign: 'center',
+                          }}
+                        >
+                          ⚠️ We recommend improving this question before querying (score &lt; 5/10)
+                        </div>
+                      )}
+                      <button
+                        onClick={() => setShowSandbox(false)}
+                        className="win98-button"
+                        style={{ padding: '6px', fontSize: '10px' }}
+                        title="Hide quality analysis"
+                      >
+                        Hide
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Sandbox Toggle (when hidden) */}
+          {!showSandbox && !loading && !answer && question.length >= 10 && (
+            <div style={{ marginBottom: '16px', textAlign: 'center' }}>
+              <button
+                onClick={() => setShowSandbox(true)}
+                className="win98-button"
+                style={{ padding: '6px 12px', fontSize: '10px' }}
+              >
+                📊 Show Question Quality Analysis
+              </button>
+            </div>
+          )}
 
           {/* Loading Progress */}
           {loading && (
